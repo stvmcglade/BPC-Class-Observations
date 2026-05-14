@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buckley Park Observations Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-branding">
+        <div class="brand-lockup">
+          <img class="brand-logo" src="BPC-logo-WordMarkWHITEcond.png" alt="Buckley Park College logo">
+          <div class="brand-copy">
+            <p class="eyebrow">Buckley Park Observations Dashboard</p>
+            <p class="brand-subtitle">Live lesson observation tools</p>
+          </div>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button id="observationToggle" class="primary-button">Start Observation</button>
+        <button id="endSessionDownload" class="end-session-button">End Class Session</button>
+        <button id="downloadPdfReport" class="ghost-button" hidden>Download PDF Report</button>
+        <button id="resetSession" class="ghost-button">Reset Session</button>
+      </div>
+    </header>
+
+    <main class="dashboard-grid">
+      <section class="panel spotlight-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Instruction Timing</p>
+            <h2>Direct instruction tracker</h2>
+          </div>
+          <button id="directInstructionToggle" class="accent-button">Start Direct Instruction</button>
+        </div>
+
+        <div class="metric-row">
+          <article class="metric-card highlight">
+            <p>Observation Time</p>
+            <strong id="observationTime">00:00:00</strong>
+          </article>
+          <article class="metric-card">
+            <p>Direct Instruction</p>
+            <strong id="directInstructionTime">00:00:00</strong>
+          </article>
+          <article class="metric-card">
+            <p>Instruction Share</p>
+            <strong id="instructionShare">0%</strong>
+          </article>
+        </div>
+
+        <div class="progress-panel">
+          <div class="progress-copy">
+            <span id="instructionStatus">Direct instruction is currently paused.</span>
+            <span id="segmentCount">0 instruction segments recorded</span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="instructionProgress" class="progress-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel summary-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Lesson Snapshot</p>
+            <h2>Live observation totals</h2>
+          </div>
+        </div>
+
+        <div class="summary-stack">
+          <article class="summary-card">
+            <span>Questions logged</span>
+            <strong id="questionTotal">0</strong>
+          </article>
+          <article class="summary-card">
+            <span>Disruptions logged</span>
+            <strong id="disruptionTotal">0</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel heatmap-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Classroom Heatmap</p>
+            <h2>Click a location to log an event</h2>
+          </div>
+        </div>
+
+        <div class="tool-selector" role="group" aria-label="Event type selector">
+          <button type="button" class="tool-button active" data-tool="question">Question</button>
+          <button type="button" class="tool-button" data-tool="disruption">Disruption</button>
+        </div>
+
+        <div class="room-frame">
+          <div class="room-front">Front of room</div>
+          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question.</p>
+          <div
+            id="heatmapSurface"
+            class="heatmap-surface"
+            aria-label="Interactive classroom layout"
+            role="button"
+            tabindex="0"
+          >
+            <div class="surface-stage" aria-hidden="true">
+              <div class="desk-row">
+                <span class="desk"></span>
+                <span class="desk"></span>
+                <span class="desk"></span>
+                <span class="desk"></span>
+              </div>
+              <div class="desk-row">
+                <span class="desk"></span>
+                <span class="desk"></span>
+                <span class="desk"></span>
+                <span class="desk"></span>
+              </div>
+              <div class="desk-row">
+                <span class="desk"></span>
+                <span class="desk"></span>
+                <span class="desk"></span>
+                <span class="desk"></span>
+              </div>
+            </div>
+            <div id="heatmapOverlay" class="heatmap-overlay" aria-hidden="true"></div>
+          </div>
+          <div class="legend">
+            <span><i class="legend-swatch question"></i> Question activity</span>
+            <span><i class="legend-swatch disruption"></i> Disruption activity</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Event Log</p>
+            <h2>Recent classroom events</h2>
+          </div>
+          <button id="undoLastEvent" class="ghost-button">Undo Last Event</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Observation Clock</th>
+              </tr>
+            </thead>
+            <tbody id="eventLogBody">
+              <tr class="empty-row">
+                <td colspan="3">No events recorded yet. Choose an event type and click the classroom map.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel notes-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Observation Notes</p>
+            <h2>Feedback for the teacher</h2>
+          </div>
+        </div>
+
+        <label class="notes-field" for="observationNotes">
+          <span class="notes-helper">Add strengths, next steps, and other lesson notes during the observation.</span>
+          <textarea
+            id="observationNotes"
+            class="notes-input"
+            rows="5"
+            placeholder="Type observation notes here..."
+          ></textarea>
+        </label>
+      </section>
+
+      <section class="panel analytics-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Live Data Dashboard</p>
+            <h2>Observation trends and time comparisons</h2>
+          </div>
+        </div>
+
+        <div class="analytics-summary">
+          <article class="summary-card analytics-card">
+            <span>Questions per 5 min</span>
+            <strong id="questionRate">--</strong>
+          </article>
+          <article class="summary-card analytics-card">
+            <span>Disruptions per 5 min</span>
+            <strong id="disruptionRate">--</strong>
+          </article>
+          <article class="summary-card analytics-card">
+            <span>Events during direct instruction</span>
+            <strong id="directEventShare">--</strong>
+          </article>
+        </div>
+
+        <div class="analytics-grid">
+          <article class="chart-card">
+            <div class="chart-copy">
+              <h3>Lesson Time Breakdown</h3>
+              <p>Compare the observed lesson time with the portion spent in direct instruction.</p>
+            </div>
+            <div id="timeBreakdownChart" class="chart-surface">
+              <p class="chart-empty">Start the observation to build the lesson time comparison.</p>
+            </div>
+          </article>
+
+          <article class="chart-card">
+            <div class="chart-copy">
+              <h3>Questions and Disruptions Over Time</h3>
+              <p>See when classroom activity is clustering as the lesson progresses.</p>
+            </div>
+            <div id="timelineChart" class="chart-surface">
+              <p class="chart-empty">Log questions or disruptions to build the live event timeline.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js?v=20260514-7"></script>
+</body>
+</html>
