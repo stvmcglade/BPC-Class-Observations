@@ -182,6 +182,19 @@ function wrapText(text, maxChars) {
   return lines;
 }
 
+function wrapTextPreserveLineBreaks(text, maxChars) {
+  return text
+    .replaceAll("\r\n", "\n")
+    .split("\n")
+    .flatMap((line) => {
+      if (line === "") {
+        return [""];
+      }
+
+      return wrapText(line, maxChars);
+    });
+}
+
 function concatUint8Arrays(parts) {
   const totalLength = parts.reduce((total, part) => total + part.length, 0);
   const merged = new Uint8Array(totalLength);
@@ -506,6 +519,25 @@ function drawPdfText(page, x, y, text, options = {}) {
   return currentY;
 }
 
+function drawPdfTextLines(page, x, y, lines, options = {}) {
+  const size = options.size || 12;
+  const color = options.color || PDF_COLORS.text;
+  const fontName = options.bold ? "F2" : "F1";
+  const lineHeight = options.lineHeight || size + 5;
+  let currentY = y;
+
+  lines.forEach((line) => {
+    const pdfY = PDF_PAGE_HEIGHT - currentY - size;
+    page.commands.push(
+      `BT /${fontName} ${size} Tf ${formatPdfColor(color)} rg 1 0 0 1 ${x.toFixed(2)} ${pdfY.toFixed(2)} Tm ` +
+      `(${escapePdfText(line)}) Tj ET`
+    );
+    currentY += lineHeight;
+  });
+
+  return currentY;
+}
+
 function drawPdfMetricCard(page, x, y, width, height, label, value, accentColor, subtitle = "") {
   drawPdfRect(page, x, y, width, height, {
     fillColor: PDF_COLORS.panelStrong,
@@ -552,24 +584,61 @@ function drawPdfReportHeader(page, generatedAt, pageLabel) {
   });
 }
 
-function drawPdfNotesSection(page, x, y, width, height, notes) {
+function getPdfNotesLayout(width, height) {
+  const textWidth = width - 56;
+  const lineHeight = 14;
+  const maxChars = Math.max(48, Math.floor(textWidth / 5.8));
+  const maxLines = Math.max(1, Math.floor((height - 90) / lineHeight));
+
+  return {
+    textWidth,
+    lineHeight,
+    maxChars,
+    maxLines,
+  };
+}
+
+function paginatePdfNotes(notes, firstSectionWidth, firstSectionHeight, continuationSectionWidth, continuationSectionHeight) {
+  const noteText = notes.trim() || "No observation notes recorded.";
+  const firstLayout = getPdfNotesLayout(firstSectionWidth, firstSectionHeight);
+  const continuationLayout = getPdfNotesLayout(continuationSectionWidth, continuationSectionHeight);
+  const wrappedLines = wrapTextPreserveLineBreaks(noteText, firstLayout.maxChars);
+  const chunks = [wrappedLines.slice(0, firstLayout.maxLines)];
+  let currentIndex = firstLayout.maxLines;
+
+  while (currentIndex < wrappedLines.length) {
+    const remainingText = wrappedLines.slice(currentIndex).join("\n");
+    const continuationLines = wrapTextPreserveLineBreaks(remainingText, continuationLayout.maxChars);
+    chunks.push(continuationLines.slice(0, continuationLayout.maxLines));
+    currentIndex += continuationLayout.maxLines;
+  }
+
+  return {
+    chunks,
+    isEmptyState: !notes.trim(),
+    lineHeight: firstLayout.lineHeight,
+  };
+}
+
+function drawPdfNotesSection(page, x, y, width, height, noteLines, options = {}) {
+  const title = options.title || "Observation Notes";
+  const isEmptyState = Boolean(options.isEmptyState);
+  const layout = getPdfNotesLayout(width, height);
+
   drawPdfRect(page, x, y, width, height, {
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfSectionHeading(page, x + 16, y + 16, "Observation Notes");
+  drawPdfSectionHeading(page, x + 16, y + 16, title);
   drawPdfRect(page, x + 16, y + 46, width - 32, height - 62, {
     fillColor: PDF_COLORS.white,
     strokeColor: PDF_COLORS.line,
   });
 
-  const noteText = notes.trim() || "No observation notes recorded.";
-  drawPdfText(page, x + 28, y + 60, noteText, {
+  drawPdfTextLines(page, x + 28, y + 60, noteLines, {
     size: 10,
-    color: notes.trim() ? PDF_COLORS.text : PDF_COLORS.muted,
-    maxChars: Math.max(48, Math.floor((width - 56) / 5.8)),
-    width: width - 56,
-    lineHeight: 14,
+    color: isEmptyState ? PDF_COLORS.muted : PDF_COLORS.text,
+    lineHeight: layout.lineHeight,
   });
 }
 
@@ -1512,19 +1581,30 @@ function downloadStructuredPdfReport(now = Date.now()) {
   const { questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue } = getSessionAnalytics(now);
   const generatedAt = new Date(now).toLocaleString();
   const instructionShareValue = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
-  const pageOne = createPdfPage();
-  const pageTwo = createPdfPage();
-  drawPdfReportHeader(pageOne, generatedAt, "Page 1 of 2");
-  drawPdfReportHeader(pageTwo, generatedAt, "Page 2 of 2");
-
   const topY = 78;
   const sectionGap = 20;
   const topHeight = 146;
   const lowerY = topY + topHeight + sectionGap;
   const pageMargin = 28;
-  const notesHeight = 148;
-  const notesY = PDF_PAGE_HEIGHT - pageMargin - notesHeight;
-  const heatmapHeight = notesY - lowerY - sectionGap;
+  const heatmapHeight = PDF_PAGE_HEIGHT - lowerY - pageMargin;
+  const notesSectionY = 78;
+  const notesSectionHeight = PDF_PAGE_HEIGHT - notesSectionY - pageMargin;
+  const noteSectionWidth = PDF_PAGE_WIDTH - 56;
+  const notePages = paginatePdfNotes(
+    state.notes,
+    noteSectionWidth,
+    notesSectionHeight,
+    noteSectionWidth,
+    notesSectionHeight
+  );
+  const totalPages = 2 + notePages.chunks.length;
+  const pdfPages = Array.from({ length: totalPages }, () => createPdfPage());
+  const pageOne = pdfPages[0];
+  const pageTwo = pdfPages[1];
+
+  pdfPages.forEach((page, index) => {
+    drawPdfReportHeader(page, generatedAt, `Page ${index + 1} of ${totalPages}`);
+  });
 
   const instructionX = 28;
   const instructionWidth = 560;
@@ -1577,7 +1657,6 @@ function downloadStructuredPdfReport(now = Date.now()) {
   const heatmapBoxWidth = heatmapWidth - 32;
   const heatmapBoxHeight = heatmapHeight - 62;
   drawPdfHeatmap(pageOne, heatmapBoxX, heatmapBoxY, heatmapBoxWidth, heatmapBoxHeight);
-  drawPdfNotesSection(pageOne, 28, notesY, PDF_PAGE_WIDTH - 56, notesHeight, state.notes);
 
   const liveX = 28;
   const liveY = 78;
@@ -1598,9 +1677,25 @@ function downloadStructuredPdfReport(now = Date.now()) {
     directShareValue
   );
 
+  notePages.chunks.forEach((noteChunk, index) => {
+    const continuationPage = pdfPages[index + 2];
+    drawPdfNotesSection(
+      continuationPage,
+      28,
+      notesSectionY,
+      noteSectionWidth,
+      notesSectionHeight,
+      noteChunk,
+      {
+        title: index === 0 ? "Observation Notes" : "Observation Notes (continued)",
+        isEmptyState: notePages.isEmptyState,
+      }
+    );
+  });
+
   const pdfBlob = buildPdfBlob(
-    [pageOne.commands.join("\n"), pageTwo.commands.join("\n")],
-    [[], []]
+    pdfPages.map((page) => page.commands.join("\n")),
+    pdfPages.map(() => [])
   );
   const pdfUrl = URL.createObjectURL(pdfBlob);
   const link = document.createElement("a");
