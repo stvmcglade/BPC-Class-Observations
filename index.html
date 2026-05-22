@@ -31,9 +31,12 @@
         <div class="panel-header">
           <div>
             <p class="section-label">Instruction Timing</p>
-            <h2>Direct instruction tracker</h2>
+            <h2>Instruction and independent work tracker</h2>
           </div>
-          <button id="directInstructionToggle" class="accent-button">Start Direct Instruction</button>
+          <div class="timing-actions">
+            <button id="directInstructionToggle" class="accent-button">Start Direct Instruction</button>
+            <button id="independentWorkToggle" class="ghost-button independent-button">Start Independent Work</button>
+          </div>
         </div>
 
         <div class="metric-row">
@@ -46,8 +49,16 @@
             <strong id="directInstructionTime">00:00:00</strong>
           </article>
           <article class="metric-card">
-            <p>Instruction Share</p>
-            <strong id="instructionShare">0%</strong>
+            <p>Independent Work</p>
+            <strong id="independentWorkTime">00:00:00</strong>
+          </article>
+          <article class="metric-card">
+            <p>Direct Share</p>
+            <strong id="directInstructionShare">0%</strong>
+          </article>
+          <article class="metric-card">
+            <p>Independent Share</p>
+            <strong id="independentWorkShare">0%</strong>
           </article>
         </div>
 
@@ -58,6 +69,7 @@
           </div>
           <div class="progress-track" aria-hidden="true">
             <div id="instructionProgress" class="progress-fill"></div>
+            <div id="independentProgress" class="progress-fill independent"></div>
           </div>
         </div>
       </section>
@@ -93,15 +105,16 @@
         <div class="tool-selector" role="group" aria-label="Event type selector">
           <button type="button" class="tool-button active" data-tool="question">Question</button>
           <button type="button" class="tool-button" data-tool="disruption">Disruption</button>
+          <button type="button" class="tool-button" data-tool="teacherMovement">Teacher movement</button>
         </div>
 
         <div class="room-frame">
           <div class="room-front">Front of room</div>
-          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question.</p>
+          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question, disruption or teacher movement.</p>
           <div
             id="heatmapSurface"
             class="heatmap-surface"
-            aria-label="Interactive classroom layout"
+            aria-label="Tap anywhere in the classroom to log a question, disruption or teacher movement"
             role="button"
             tabindex="0"
           >
@@ -130,6 +143,7 @@
           <div class="legend">
             <span><i class="legend-swatch question"></i> Question activity</span>
             <span><i class="legend-swatch disruption"></i> Disruption activity</span>
+            <span><i class="legend-swatch teacherMovement"></i> Teacher movement</span>
           </div>
         </div>
       </section>
@@ -228,6 +242,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=20260514-7"></script>
+  <script src="app.js?v=20260521-1"></script>
 </body>
 </html>

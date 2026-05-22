@@ -2,6 +2,7 @@ const STORAGE_KEY = "lesson-observation-dashboard-state";
 const TOOL_TYPES = {
   question: "Question",
   disruption: "Disruption",
+  teacherMovement: "Teacher movement",
 };
 const PDF_PAGE_WIDTH = 1191;
 const PDF_PAGE_HEIGHT = 842;
@@ -15,6 +16,7 @@ const PDF_COLORS = {
   green: [0.133, 0.773, 0.369],
   amber: [0.961, 0.62, 0.043],
   blue: [0.376, 0.647, 0.98],
+  cyan: [0.22, 0.741, 0.973],
   red: [0.973, 0.443, 0.443],
   slate: [0.875, 0.906, 0.941],
   darkSlate: [0.19, 0.28, 0.36],
@@ -23,6 +25,7 @@ const PDF_COLORS = {
 
 const observationToggle = document.getElementById("observationToggle");
 const directInstructionToggle = document.getElementById("directInstructionToggle");
+const independentWorkToggle = document.getElementById("independentWorkToggle");
 const endSessionDownloadButton = document.getElementById("endSessionDownload");
 const downloadPdfReportButton = document.getElementById("downloadPdfReport");
 const resetSessionButton = document.getElementById("resetSession");
@@ -36,10 +39,13 @@ const toolButtons = [...document.querySelectorAll(".tool-button")];
 
 const observationTime = document.getElementById("observationTime");
 const directInstructionTime = document.getElementById("directInstructionTime");
-const instructionShare = document.getElementById("instructionShare");
+const independentWorkTime = document.getElementById("independentWorkTime");
+const directInstructionShare = document.getElementById("directInstructionShare");
+const independentWorkShare = document.getElementById("independentWorkShare");
 const instructionStatus = document.getElementById("instructionStatus");
 const segmentCount = document.getElementById("segmentCount");
 const instructionProgress = document.getElementById("instructionProgress");
+const independentProgress = document.getElementById("independentProgress");
 const questionTotal = document.getElementById("questionTotal");
 const disruptionTotal = document.getElementById("disruptionTotal");
 const questionRate = document.getElementById("questionRate");
@@ -47,6 +53,18 @@ const disruptionRate = document.getElementById("disruptionRate");
 const directEventShare = document.getElementById("directEventShare");
 const timeBreakdownChart = document.getElementById("timeBreakdownChart");
 const timelineChart = document.getElementById("timelineChart");
+
+function getEventColor(type) {
+  if (type === "question") {
+    return PDF_COLORS.blue;
+  }
+
+  if (type === "disruption") {
+    return PDF_COLORS.red;
+  }
+
+  return PDF_COLORS.green;
+}
 
 function defaultState() {
   return {
@@ -58,6 +76,10 @@ function defaultState() {
     directStartedAt: null,
     directElapsedMs: 0,
     directSegments: 0,
+    independentRunning: false,
+    independentStartedAt: null,
+    independentElapsedMs: 0,
+    independentSegments: 0,
     sessionEndedAt: null,
     notes: "",
     events: [],
@@ -133,8 +155,11 @@ function getSessionAnalytics(now = Date.now()) {
   const observedMinutes = observationMs / 60000;
   const questionPer5 = observedMinutes > 0 ? (totals.question / observedMinutes) * 5 : 0;
   const disruptionPer5 = observedMinutes > 0 ? (totals.disruption / observedMinutes) * 5 : 0;
-  const directEvents = state.events.filter((event) => event.duringDirectInstruction).length;
-  const totalEvents = state.events.length;
+  const analyzableEvents = state.events.filter(
+    (event) => event.type === "question" || event.type === "disruption"
+  );
+  const directEvents = analyzableEvents.filter((event) => event.duringDirectInstruction).length;
+  const totalEvents = analyzableEvents.length;
   const directShareValue = totalEvents === 0 ? 0 : Math.round((directEvents / totalEvents) * 100);
 
   return {
@@ -691,20 +716,24 @@ function drawPdfHeatmap(page, x, y, width, height) {
   const clusters = buildPdfHeatmapClusters(roomX, roomY, roomWidth, roomHeight);
 
   clusters.forEach((cluster) => {
-    const markerColor = cluster.type === "question" ? PDF_COLORS.blue : PDF_COLORS.red;
-    const outerColor = cluster.type === "question" ? questionOuter : disruptionOuter;
-    const midColor = cluster.type === "question" ? questionMid : disruptionMid;
+    const markerColor = getEventColor(cluster.type);
+    const isTeacherMovement = cluster.type === "teacherMovement";
+    const outerColor = cluster.type === "question" ? questionOuter : cluster.type === "disruption" ? disruptionOuter : null;
+    const midColor = cluster.type === "question" ? questionMid : cluster.type === "disruption" ? disruptionMid : null;
     const countRadiusBoost = Math.min(8, (cluster.count - 1) * 1.4);
     const outerRadius = 13 + countRadiusBoost;
     const midRadius = 8 + Math.min(5, (cluster.count - 1) * 0.9);
 
-    drawPdfCircle(page, cluster.x, cluster.y, outerRadius, {
-      fillColor: outerColor,
-    });
-    drawPdfCircle(page, cluster.x, cluster.y, midRadius, {
-      fillColor: midColor,
-    });
-    drawPdfCircle(page, cluster.x, cluster.y, 4.2, {
+    if (!isTeacherMovement) {
+      drawPdfCircle(page, cluster.x, cluster.y, outerRadius, {
+        fillColor: outerColor,
+      });
+      drawPdfCircle(page, cluster.x, cluster.y, midRadius, {
+        fillColor: midColor,
+      });
+    }
+
+    drawPdfCircle(page, cluster.x, cluster.y, isTeacherMovement ? 5 : 4.2, {
       fillColor: markerColor,
       strokeColor: PDF_COLORS.white,
       lineWidth: 0.9,
@@ -737,13 +766,20 @@ function drawPdfHeatmap(page, x, y, width, height) {
     width: 130,
   });
   drawPdfCircle(page, x + 26, y + height - 8, 6, { fillColor: PDF_COLORS.blue });
-  drawPdfText(page, x + 170, y + height - 28, "Disruption activity", {
+  drawPdfText(page, x + 156, y + height - 28, "Disruption activity", {
     size: 10,
     color: PDF_COLORS.muted,
     maxChars: 24,
     width: 140,
   });
-  drawPdfCircle(page, x + 176, y + height - 8, 6, { fillColor: PDF_COLORS.red });
+  drawPdfCircle(page, x + 162, y + height - 8, 6, { fillColor: PDF_COLORS.red });
+  drawPdfText(page, x + 298, y + height - 28, "Teacher movement", {
+    size: 10,
+    color: PDF_COLORS.muted,
+    maxChars: 20,
+    width: 130,
+  });
+  drawPdfCircle(page, x + 304, y + height - 8, 6, { fillColor: PDF_COLORS.green });
 }
 
 function getTimelineData(observationMs) {
@@ -759,6 +795,10 @@ function getTimelineData(observationMs) {
   }));
 
   state.events.forEach((event) => {
+    if (!(event.type in buckets[0])) {
+      return;
+    }
+
     const bucketIndex = clamp(Math.floor(event.observationMs / bucketMs), 0, bucketCount - 1);
     buckets[bucketIndex][event.type] += 1;
   });
@@ -766,7 +806,7 @@ function getTimelineData(observationMs) {
   return { bucketMinutes, buckets };
 }
 
-function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, directMs) {
+function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, directMs, independentMs) {
   drawPdfRect(page, x, y, width, height, {
     fillColor: PDF_COLORS.white,
     strokeColor: PDF_COLORS.line,
@@ -789,12 +829,15 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
   const chartY = y + 78;
   const barWidth = width - 28;
   const barX = x + 14;
-  const otherMs = Math.max(0, observationMs - directMs);
+  const otherMs = Math.max(0, observationMs - directMs - independentMs);
   const directShare = observationMs === 0 ? 0 : directMs / observationMs;
+  const independentShare = observationMs === 0 ? 0 : independentMs / observationMs;
+  const otherShare = Math.max(0, 1 - directShare - independentShare);
   const directWidth = barWidth * directShare;
-  const metricY = chartY + 32;
+  const independentWidth = barWidth * independentShare;
+  const metricY = chartY + 30;
   const metricGap = 10;
-  const metricWidth = (width - 28 - metricGap) / 2;
+  const metricWidth = (width - 28 - metricGap * 2) / 3;
 
   drawPdfRect(page, barX, chartY, barWidth, 18, {
     fillColor: PDF_COLORS.slate,
@@ -803,6 +846,12 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
   if (directWidth > 0) {
     drawPdfRect(page, barX, chartY, directWidth, 18, {
       fillColor: PDF_COLORS.green,
+    });
+  }
+
+  if (independentWidth > 0) {
+    drawPdfRect(page, barX + directWidth, chartY, independentWidth, 18, {
+      fillColor: PDF_COLORS.cyan,
     });
   }
 
@@ -836,13 +885,31 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 7, "Other observation time", {
+  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 7, "Independent work", {
+    size: 9,
+    color: PDF_COLORS.muted,
+    maxChars: 24,
+    width: metricWidth - 20,
+  });
+  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 19, `${formatMinutes(independentMs)} (${Math.round(independentShare * 100)}%)`, {
+    size: 10,
+    bold: true,
+    color: PDF_COLORS.cyan,
+    maxChars: 30,
+    width: metricWidth - 20,
+  });
+
+  drawPdfRect(page, barX + (metricWidth + metricGap) * 2, metricY, metricWidth, 34, {
+    fillColor: PDF_COLORS.panel,
+    strokeColor: PDF_COLORS.line,
+  });
+  drawPdfText(page, barX + (metricWidth + metricGap) * 2 + 10, metricY + 7, "Other observation time", {
     size: 9,
     color: PDF_COLORS.muted,
     maxChars: 26,
     width: metricWidth - 20,
   });
-  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 19, `${formatMinutes(otherMs)} (${Math.round((1 - directShare) * 100)}%)`, {
+  drawPdfText(page, barX + (metricWidth + metricGap) * 2 + 10, metricY + 19, `${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)`, {
     size: 10,
     bold: true,
     color: PDF_COLORS.darkSlate,
@@ -1064,7 +1131,7 @@ function drawPdfEventLogSection(page, x, y, width, height) {
       drawPdfText(page, x + 190, rowY, TOOL_TYPES[event.type], {
         size: 8,
         bold: true,
-        color: event.type === "question" ? PDF_COLORS.blue : PDF_COLORS.red,
+        color: getEventColor(event.type),
         maxChars: 12,
         width: 52,
       });
@@ -1089,7 +1156,7 @@ function drawPdfEventLogSection(page, x, y, width, height) {
   }
 }
 
-function drawPdfLiveDashboardSection(page, x, y, width, height, observationMs, directMs, questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue) {
+function drawPdfLiveDashboardSection(page, x, y, width, height, observationMs, directMs, independentMs, questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue) {
   drawPdfRect(page, x, y, width, height, {
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
@@ -1118,7 +1185,7 @@ function drawPdfLiveDashboardSection(page, x, y, width, height, observationMs, d
   const chartGap = 16;
   const secondChartY = firstChartY + firstChartHeight + chartGap;
   const secondChartHeight = height - (secondChartY - y) - 16;
-  drawPdfTimeBreakdownChart(page, x + 16, firstChartY, chartWidth, firstChartHeight, observationMs, directMs);
+  drawPdfTimeBreakdownChart(page, x + 16, firstChartY, chartWidth, firstChartHeight, observationMs, directMs, independentMs);
   drawPdfTimelineChart(page, x + 16, secondChartY, chartWidth, secondChartHeight, observationMs);
 }
 
@@ -1577,13 +1644,15 @@ async function buildA3ReportPdfBlob(now = Date.now()) {
 function downloadStructuredPdfReport(now = Date.now()) {
   const observationMs = getObservationElapsed(now);
   const directMs = getDirectElapsed(now);
+  const independentMs = getIndependentElapsed(now);
   const totals = getTotals();
   const { questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue } = getSessionAnalytics(now);
   const generatedAt = new Date(now).toLocaleString();
-  const instructionShareValue = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
+  const directInstructionShareValue = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
+  const independentWorkShareValue = observationMs === 0 ? 0 : Math.round((independentMs / observationMs) * 100);
   const topY = 78;
   const sectionGap = 20;
-  const topHeight = 146;
+  const topHeight = 220;
   const lowerY = topY + topHeight + sectionGap;
   const pageMargin = 28;
   const heatmapHeight = PDF_PAGE_HEIGHT - lowerY - pageMargin;
@@ -1618,18 +1687,20 @@ function downloadStructuredPdfReport(now = Date.now()) {
   drawPdfSectionHeading(pageOne, instructionX + 16, topY + 16, "Instruction Timing");
   drawPdfMetricCard(pageOne, instructionX + 16, topY + 46, 164, 72, "Observation Time", formatDuration(observationMs), PDF_COLORS.text);
   drawPdfMetricCard(pageOne, instructionX + 196, topY + 46, 164, 72, "Direct Instruction", formatDuration(directMs), PDF_COLORS.green);
-  drawPdfMetricCard(pageOne, instructionX + 376, topY + 46, 168, 72, "Instruction Share", `${instructionShareValue}%`, PDF_COLORS.amber);
-  drawPdfText(pageOne, instructionX + 16, topY + 128, instructionStatus.textContent, {
+  drawPdfMetricCard(pageOne, instructionX + 376, topY + 46, 168, 72, "Independent Work", formatDuration(independentMs), PDF_COLORS.cyan);
+  drawPdfMetricCard(pageOne, instructionX + 16, topY + 128, 254, 62, "Direct Share", `${directInstructionShareValue}%`, PDF_COLORS.amber);
+  drawPdfMetricCard(pageOne, instructionX + 290, topY + 128, 254, 62, "Independent Share", `${independentWorkShareValue}%`, PDF_COLORS.cyan);
+  drawPdfText(pageOne, instructionX + 16, topY + 198, instructionStatus.textContent, {
     size: 10,
     color: PDF_COLORS.muted,
     maxChars: 56,
     width: 280,
   });
-  drawPdfText(pageOne, instructionX + 330, topY + 128, segmentCount.textContent, {
+  drawPdfText(pageOne, instructionX + 300, topY + 198, segmentCount.textContent, {
     size: 10,
     color: PDF_COLORS.muted,
-    maxChars: 36,
-    width: 220,
+    maxChars: 48,
+    width: 244,
   });
 
   drawPdfRect(pageOne, snapshotX, topY, snapshotWidth, topHeight, {
@@ -1670,6 +1741,7 @@ function downloadStructuredPdfReport(now = Date.now()) {
     liveHeight,
     observationMs,
     directMs,
+    independentMs,
     questionPer5,
     disruptionPer5,
     directEvents,
@@ -1729,6 +1801,14 @@ function getDirectElapsed(now = Date.now()) {
   return state.directElapsedMs + (now - state.directStartedAt);
 }
 
+function getIndependentElapsed(now = Date.now()) {
+  if (!state.independentRunning || !state.independentStartedAt) {
+    return state.independentElapsedMs;
+  }
+
+  return state.independentElapsedMs + (now - state.independentStartedAt);
+}
+
 function pauseObservation(now = Date.now()) {
   state.observationElapsedMs = getObservationElapsed(now);
   state.observationRunning = false;
@@ -1741,6 +1821,12 @@ function pauseDirectInstruction(now = Date.now()) {
   state.directStartedAt = null;
 }
 
+function pauseIndependentWork(now = Date.now()) {
+  state.independentElapsedMs = getIndependentElapsed(now);
+  state.independentRunning = false;
+  state.independentStartedAt = null;
+}
+
 function toggleObservation() {
   const now = Date.now();
 
@@ -1749,6 +1835,10 @@ function toggleObservation() {
 
     if (state.directRunning) {
       pauseDirectInstruction(now);
+    }
+
+    if (state.independentRunning) {
+      pauseIndependentWork(now);
     }
   } else {
     clearEndedSessionFlag();
@@ -1773,6 +1863,11 @@ function toggleDirectInstruction() {
     pauseDirectInstruction(now);
   } else {
     clearEndedSessionFlag();
+
+    if (state.independentRunning) {
+      pauseIndependentWork(now);
+    }
+
     state.directRunning = true;
     state.directStartedAt = now;
     state.directSegments += 1;
@@ -1782,9 +1877,40 @@ function toggleDirectInstruction() {
   render();
 }
 
+function toggleIndependentWork() {
+  const now = Date.now();
+
+  if (!state.observationRunning) {
+    clearEndedSessionFlag();
+    state.observationRunning = true;
+    state.observationStartedAt = now;
+  }
+
+  if (state.independentRunning) {
+    pauseIndependentWork(now);
+  } else {
+    clearEndedSessionFlag();
+
+    if (state.directRunning) {
+      pauseDirectInstruction(now);
+    }
+
+    state.independentRunning = true;
+    state.independentStartedAt = now;
+    state.independentSegments += 1;
+  }
+
+  saveState();
+  render();
+}
+
 function getTotals() {
   return state.events.reduce(
     (totals, event) => {
+      if (!(event.type in totals)) {
+        return totals;
+      }
+
       totals[event.type] += 1;
       return totals;
     },
@@ -1851,6 +1977,10 @@ function buildHeatmap() {
         return;
       }
 
+      if (event.type === "teacherMovement") {
+        return;
+      }
+
       const glow = document.createElement("span");
       glow.className = `heat-glow ${event.type}`;
       glow.style.left = `${event.point.xPercent}%`;
@@ -1886,6 +2016,10 @@ async function endClassSession() {
 
   if (state.directRunning) {
     pauseDirectInstruction(now);
+  }
+
+  if (state.independentRunning) {
+    pauseIndependentWork(now);
   }
 
   if (state.observationRunning) {
@@ -1924,19 +2058,21 @@ function getBucketSizeMinutes(observationMs) {
   return 10;
 }
 
-function buildTimeBreakdownChart(observationMs, directMs) {
+function buildTimeBreakdownChart(observationMs, directMs, independentMs) {
   if (observationMs <= 0) {
     return `
       <p class="chart-empty">Start the observation to build the lesson time comparison.</p>
     `;
   }
 
-  const otherMs = Math.max(0, observationMs - directMs);
+  const otherMs = Math.max(0, observationMs - directMs - independentMs);
   const directShare = observationMs === 0 ? 0 : directMs / observationMs;
-  const otherShare = 1 - directShare;
+  const independentShare = observationMs === 0 ? 0 : independentMs / observationMs;
+  const otherShare = Math.max(0, 1 - directShare - independentShare);
   const barWidth = 420;
   const directWidth = Math.max(0, Math.round(barWidth * directShare));
-  const otherWidth = Math.max(0, barWidth - directWidth);
+  const independentWidth = Math.max(0, Math.round(barWidth * independentShare));
+  const otherWidth = Math.max(0, barWidth - directWidth - independentWidth);
 
   return `
     <svg class="chart-svg" viewBox="0 0 520 260" role="img" aria-label="Lesson time breakdown">
@@ -1946,17 +2082,22 @@ function buildTimeBreakdownChart(observationMs, directMs) {
 
       <rect x="34" y="102" width="${barWidth}" height="34" rx="17" fill="rgba(255, 255, 255, 0.08)"></rect>
       <rect x="34" y="102" width="${directWidth}" height="34" rx="17" fill="#22c55e"></rect>
-      <rect x="${34 + directWidth}" y="102" width="${otherWidth}" height="34" rx="17" fill="#2d4a5b"></rect>
+      <rect x="${34 + directWidth}" y="102" width="${independentWidth}" height="34" rx="17" fill="#38bdf8"></rect>
+      <rect x="${34 + directWidth + independentWidth}" y="102" width="${otherWidth}" height="34" rx="17" fill="#2d4a5b"></rect>
 
-      <circle cx="42" cy="166" r="6" fill="#22c55e"></circle>
-      <text x="56" y="171" font-size="14" fill="#9fb0c1">Direct instruction</text>
-      <text x="218" y="171" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(directMs)} (${Math.round(directShare * 100)}%)</text>
+      <circle cx="42" cy="160" r="6" fill="#22c55e"></circle>
+      <text x="56" y="165" font-size="14" fill="#9fb0c1">Direct instruction</text>
+      <text x="218" y="165" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(directMs)} (${Math.round(directShare * 100)}%)</text>
 
-      <circle cx="42" cy="196" r="6" fill="#2d4a5b"></circle>
-      <text x="56" y="201" font-size="14" fill="#9fb0c1">Other observation time</text>
-      <text x="218" y="201" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)</text>
+      <circle cx="42" cy="190" r="6" fill="#38bdf8"></circle>
+      <text x="56" y="195" font-size="14" fill="#9fb0c1">Independent work</text>
+      <text x="218" y="195" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(independentMs)} (${Math.round(independentShare * 100)}%)</text>
 
-      <text x="34" y="234" font-size="13" fill="#9fb0c1">The bar updates continuously, so you can compare direct instruction against the rest of the lesson at a glance.</text>
+      <circle cx="42" cy="220" r="6" fill="#2d4a5b"></circle>
+      <text x="56" y="225" font-size="14" fill="#9fb0c1">Other observation time</text>
+      <text x="218" y="225" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)</text>
+
+      <text x="34" y="246" font-size="12" fill="#9fb0c1">The bar updates continuously, so you can compare direct instruction, independent work, and the rest of the lesson at a glance.</text>
     </svg>
   `;
 }
@@ -2027,6 +2168,7 @@ function buildTimelineChart(observationMs) {
 function renderAnalytics(now = Date.now()) {
   const observationMs = getObservationElapsed(now);
   const directMs = getDirectElapsed(now);
+  const independentMs = getIndependentElapsed(now);
   const sessionEnded = hasEndedSession();
 
   if (sessionEnded) {
@@ -2040,31 +2182,45 @@ function renderAnalytics(now = Date.now()) {
     directEventShare.textContent = "--";
   }
 
-  timeBreakdownChart.innerHTML = buildTimeBreakdownChart(observationMs, directMs);
+  timeBreakdownChart.innerHTML = buildTimeBreakdownChart(observationMs, directMs, independentMs);
   timelineChart.innerHTML = buildTimelineChart(observationMs);
 }
 
 function renderSummary(now = Date.now()) {
   const observationMs = getObservationElapsed(now);
   const directMs = getDirectElapsed(now);
+  const independentMs = getIndependentElapsed(now);
   const totals = getTotals();
-  const share = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
+  const directShareExact = observationMs === 0 ? 0 : (directMs / observationMs) * 100;
+  const independentShareExact = observationMs === 0 ? 0 : (independentMs / observationMs) * 100;
+  const directShare = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
+  const independentShare = observationMs === 0 ? 0 : Math.round((independentMs / observationMs) * 100);
   const sessionEnded = hasEndedSession();
 
   observationTime.textContent = formatDuration(observationMs);
   directInstructionTime.textContent = formatDuration(directMs);
-  instructionShare.textContent = `${share}%`;
+  independentWorkTime.textContent = formatDuration(independentMs);
+  directInstructionShare.textContent = `${directShare}%`;
+  independentWorkShare.textContent = `${independentShare}%`;
   questionTotal.textContent = totals.question;
   disruptionTotal.textContent = totals.disruption;
-  instructionProgress.style.width = `${Math.min(share, 100)}%`;
-  segmentCount.textContent = `${state.directSegments} instruction segment${state.directSegments === 1 ? "" : "s"} recorded`;
+  instructionProgress.style.width = `${Math.min(directShareExact, 100)}%`;
+  instructionProgress.style.left = "0%";
+  independentProgress.style.width = `${Math.min(independentShareExact, Math.max(0, 100 - directShareExact))}%`;
+  independentProgress.style.left = `${Math.min(directShareExact, 100)}%`;
+  segmentCount.textContent =
+    `Direct segments: ${state.directSegments} | Independent segments: ${state.independentSegments}`;
   instructionStatus.textContent = state.directRunning
     ? "Direct instruction is running right now."
-    : "Direct instruction is currently paused.";
+    : state.independentRunning
+      ? "Independent work is running right now."
+      : "Direct instruction and independent work are currently paused.";
 
   observationToggle.textContent = state.observationRunning ? "Pause Observation" : "Start Observation";
   directInstructionToggle.textContent = state.directRunning ? "Pause Direct Instruction" : "Start Direct Instruction";
   directInstructionToggle.classList.toggle("running", state.directRunning);
+  independentWorkToggle.textContent = state.independentRunning ? "Pause Independent Work" : "Start Independent Work";
+  independentWorkToggle.classList.toggle("running", state.independentRunning);
   endSessionDownloadButton.textContent = sessionEnded ? "Session Ended" : "End Class Session";
   endSessionDownloadButton.disabled = sessionEnded;
 
@@ -2081,8 +2237,8 @@ function renderToolState() {
     button.classList.toggle("active", isActive);
   });
 
-  tapHint.textContent = `Tap anywhere in the room to log a ${TOOL_TYPES[state.selectedTool].toLowerCase()}.`;
-  heatmapSurface.setAttribute("aria-label", `Tap anywhere in the classroom to log a ${TOOL_TYPES[state.selectedTool].toLowerCase()}`);
+  tapHint.textContent = "Tap anywhere in the room to log a question, disruption or teacher movement.";
+  heatmapSurface.setAttribute("aria-label", "Tap anywhere in the classroom to log a question, disruption or teacher movement");
 }
 
 function renderLog() {
@@ -2158,6 +2314,7 @@ heatmapSurface.addEventListener("keydown", (event) => {
 
 observationToggle.addEventListener("click", toggleObservation);
 directInstructionToggle.addEventListener("click", toggleDirectInstruction);
+independentWorkToggle.addEventListener("click", toggleIndependentWork);
 endSessionDownloadButton.addEventListener("click", endClassSession);
 downloadPdfReportButton.addEventListener("click", handlePdfDownload);
 resetSessionButton.addEventListener("click", resetSession);
