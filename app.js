@@ -68,6 +68,7 @@ const independentProgress = document.getElementById("independentProgress");
 const collaborationProgress = document.getElementById("collaborationProgress");
 const questionTotal = document.getElementById("questionTotal");
 const disruptionTotal = document.getElementById("disruptionTotal");
+const teacherMovementTotal = document.getElementById("teacherMovementTotal");
 const questionRate = document.getElementById("questionRate");
 const disruptionRate = document.getElementById("disruptionRate");
 const directEventShare = document.getElementById("directEventShare");
@@ -613,6 +614,10 @@ function drawPdfSectionHeading(page, x, y, title) {
 
 function drawPdfCheckbox(page, x, y, checked, label, options = {}) {
   const size = options.size || 14;
+  const labelSize = options.labelSize || 11;
+  const labelWidth = options.labelWidth || 240;
+  const labelMaxChars = options.maxChars || 36;
+  const checkStrokeWidth = options.checkStrokeWidth || 2;
   const boxY = y + 1;
   drawPdfRect(page, x, boxY, size, size, {
     fillColor: PDF_COLORS.white,
@@ -623,19 +628,19 @@ function drawPdfCheckbox(page, x, y, checked, label, options = {}) {
   if (checked) {
     drawPdfLine(page, x + 3, boxY + 7, x + 6, boxY + 10, {
       strokeColor: PDF_COLORS.green,
-      lineWidth: 2,
+      lineWidth: checkStrokeWidth,
     });
     drawPdfLine(page, x + 6, boxY + 10, x + 11, boxY + 4, {
       strokeColor: PDF_COLORS.green,
-      lineWidth: 2,
+      lineWidth: checkStrokeWidth,
     });
   }
 
   drawPdfText(page, x + size + 10, y - 1, label, {
-    size: 11,
+    size: labelSize,
     color: PDF_COLORS.text,
-    maxChars: 36,
-    width: 240,
+    maxChars: labelMaxChars,
+    width: labelWidth,
   });
 }
 
@@ -646,39 +651,47 @@ function drawPdfRoutinesSection(page, x, y, width, height) {
   });
   drawPdfSectionHeading(page, x + 16, y + 16, "Safe and Orderly Routines");
 
-  const columnGap = 24;
+  const columnGap = 18;
   const columnWidth = (width - 48 - columnGap) / 2;
   const leftX = x + 16;
   const rightX = leftX + columnWidth + columnGap;
-  const groupY = y + 48;
+  const groupY = y + 34;
+  const groupHeight = height - 50;
+  const checkboxOptions = {
+    size: 10,
+    labelSize: 9,
+    labelWidth: columnWidth - 42,
+    maxChars: 28,
+    checkStrokeWidth: 1.6,
+  };
 
-  drawPdfRect(page, leftX, groupY, columnWidth, height - 64, {
+  drawPdfRect(page, leftX, groupY, columnWidth, groupHeight, {
     fillColor: PDF_COLORS.panelStrong,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfRect(page, rightX, groupY, columnWidth, height - 64, {
+  drawPdfRect(page, rightX, groupY, columnWidth, groupHeight, {
     fillColor: PDF_COLORS.panelStrong,
     strokeColor: PDF_COLORS.line,
   });
 
-  drawPdfText(page, leftX + 14, groupY + 12, "Start of Lesson", {
-    size: 12,
+  drawPdfText(page, leftX + 12, groupY + 10, "Start of Lesson", {
+    size: 11,
     bold: true,
     color: PDF_COLORS.text,
-    width: columnWidth - 28,
+    width: columnWidth - 24,
   });
-  drawPdfCheckbox(page, leftX + 14, groupY + 40, state.routines.entry, "Safe and Orderly Entry");
-  drawPdfCheckbox(page, leftX + 14, groupY + 68, state.routines.ready, "Ready to Learn");
+  drawPdfCheckbox(page, leftX + 12, groupY + 24, state.routines.entry, "Safe and Orderly Entry", checkboxOptions);
+  drawPdfCheckbox(page, leftX + 12, groupY + 42, state.routines.ready, "Ready to Learn", checkboxOptions);
 
-  drawPdfText(page, rightX + 14, groupY + 12, "End of Lesson", {
-    size: 12,
+  drawPdfText(page, rightX + 12, groupY + 10, "End of Lesson", {
+    size: 11,
     bold: true,
     color: PDF_COLORS.text,
-    width: columnWidth - 28,
+    width: columnWidth - 24,
   });
-  drawPdfCheckbox(page, rightX + 14, groupY + 40, state.routines.tidy, "Tidy Area");
-  drawPdfCheckbox(page, rightX + 14, groupY + 68, state.routines.chairs, "Chairs and Desks");
-  drawPdfCheckbox(page, rightX + 14, groupY + 96, state.routines.exit, "Safe and Orderly Exit");
+  drawPdfCheckbox(page, rightX + 12, groupY + 24, state.routines.tidy, "Tidy Area", checkboxOptions);
+  drawPdfCheckbox(page, rightX + 12, groupY + 42, state.routines.chairs, "Chairs and Desks", checkboxOptions);
+  drawPdfCheckbox(page, rightX + 12, groupY + 60, state.routines.exit, "Safe and Orderly Exit", checkboxOptions);
 }
 
 function drawPdfReportHeader(page, generatedAt, pageLabel) {
@@ -1780,8 +1793,8 @@ function downloadStructuredPdfReport(now = Date.now()) {
   const independentWorkShareValue = observationMs === 0 ? 0 : Math.round((independentMs / observationMs) * 100);
   const collaborationShareValue = observationMs === 0 ? 0 : Math.round((collaborationMs / observationMs) * 100);
   const routinesY = 78;
-  const routinesHeight = 138;
-  const sectionGap = 20;
+  const routinesHeight = 132;
+  const sectionGap = 18;
   const topY = routinesY + routinesHeight + sectionGap;
   const topHeight = 188;
   const lowerY = topY + topHeight + sectionGap;
@@ -1840,8 +1853,11 @@ function downloadStructuredPdfReport(now = Date.now()) {
     strokeColor: PDF_COLORS.line,
   });
   drawPdfSectionHeading(pageOne, snapshotX + 16, topY + 16, "Lesson Snapshot");
-  drawPdfMetricCard(pageOne, snapshotX + 16, topY + 46, (snapshotWidth - 48) / 2, 72, "Questions logged", String(totals.question), PDF_COLORS.blue);
-  drawPdfMetricCard(pageOne, snapshotX + 32 + (snapshotWidth - 48) / 2, topY + 46, (snapshotWidth - 48) / 2, 72, "Disruptions logged", String(totals.disruption), PDF_COLORS.red);
+  const snapshotCardGap = 8;
+  const snapshotCardWidth = (snapshotWidth - 32 - snapshotCardGap * 2) / 3;
+  drawPdfMetricCard(pageOne, snapshotX + 16, topY + 46, snapshotCardWidth, 72, "Questions logged", String(totals.question), PDF_COLORS.blue);
+  drawPdfMetricCard(pageOne, snapshotX + 16 + snapshotCardWidth + snapshotCardGap, topY + 46, snapshotCardWidth, 72, "Disruptions logged", String(totals.disruption), PDF_COLORS.red);
+  drawPdfMetricCard(pageOne, snapshotX + 16 + (snapshotCardWidth + snapshotCardGap) * 2, topY + 46, snapshotCardWidth, 72, "Teacher movements", String(totals.teacherMovement), PDF_COLORS.green);
   drawPdfText(pageOne, snapshotX + 16, topY + 128, `Total logged events: ${state.events.length}`, {
     size: 10,
     color: PDF_COLORS.muted,
@@ -2104,7 +2120,7 @@ function getTotals() {
       totals[event.type] += 1;
       return totals;
     },
-    { question: 0, disruption: 0 }
+    { question: 0, disruption: 0, teacherMovement: 0 }
   );
 }
 
@@ -2411,6 +2427,9 @@ function renderSummary(now = Date.now()) {
   collaborationShare.textContent = `${collaborationShareValue}%`;
   questionTotal.textContent = totals.question;
   disruptionTotal.textContent = totals.disruption;
+  if (teacherMovementTotal) {
+    teacherMovementTotal.textContent = totals.teacherMovement;
+  }
   instructionProgress.style.width = `${Math.min(directShareExact, 100)}%`;
   instructionProgress.style.left = "0%";
   independentProgress.style.width = `${Math.min(independentShareExact, Math.max(0, 100 - directShareExact))}%`;
