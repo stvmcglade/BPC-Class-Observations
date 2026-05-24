@@ -27,15 +27,61 @@
     </header>
 
     <main class="dashboard-grid">
+      <section class="panel routines-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Safe and Orderly Routines</p>
+            <h2>Lesson entry and exit tracker</h2>
+          </div>
+          <button id="openRoutinesGuide" type="button" class="routine-guide-link">View routines guide</button>
+        </div>
+
+        <div class="routine-grid">
+          <section class="routine-group" aria-labelledby="startOfLessonLabel">
+            <h3 id="startOfLessonLabel">Start of Lesson</h3>
+            <label class="routine-check">
+              <input id="routineEntry" type="checkbox">
+              <span>Safe and Orderly Entry</span>
+            </label>
+            <label class="routine-check">
+              <input id="routineReady" type="checkbox">
+              <span>Ready to Learn</span>
+            </label>
+          </section>
+
+          <section class="routine-group" aria-labelledby="endOfLessonLabel">
+            <h3 id="endOfLessonLabel">End of Lesson</h3>
+            <label class="routine-check">
+              <input id="routineTidy" type="checkbox">
+              <span>Tidy Area</span>
+            </label>
+            <label class="routine-check">
+              <input id="routineChairs" type="checkbox">
+              <span>Chairs and Desks</span>
+            </label>
+            <label class="routine-check">
+              <input id="routineExit" type="checkbox">
+              <span>Safe and Orderly Exit</span>
+            </label>
+          </section>
+        </div>
+      </section>
+
       <section class="panel spotlight-panel">
         <div class="panel-header">
           <div>
             <p class="section-label">Instruction Timing</p>
-            <h2>Instruction and independent work tracker</h2>
+            <h2>Teaching mode tracker</h2>
+          </div>
+          <div class="mode-definitions" aria-label="Teaching mode definitions">
+            <p><strong>Direct Instruction</strong> - Teacher is instructing to the whole class</p>
+            <p><strong>Independent Work</strong> - Students are working on assigned tasks without teacher involvement</p>
+            <p><strong>Independent Work/Teacher collaboration</strong> - Students are working on assigned tasks, and the teacher is monitoring, conferencing, and assisting individual students</p>
           </div>
           <div class="timing-actions">
             <button id="directInstructionToggle" class="accent-button">Start Direct Instruction</button>
             <button id="independentWorkToggle" class="ghost-button independent-button">Start Independent Work</button>
+            <button id="collaborationToggle" class="ghost-button collaboration-button">Start Independent Work/Teacher Collaboration</button>
           </div>
         </div>
 
@@ -47,29 +93,29 @@
           <article class="metric-card">
             <p>Direct Instruction</p>
             <strong id="directInstructionTime">00:00:00</strong>
+            <span id="directInstructionShare" class="metric-detail">0%</span>
           </article>
           <article class="metric-card">
             <p>Independent Work</p>
             <strong id="independentWorkTime">00:00:00</strong>
+            <span id="independentWorkShare" class="metric-detail">0%</span>
           </article>
           <article class="metric-card">
-            <p>Direct Share</p>
-            <strong id="directInstructionShare">0%</strong>
-          </article>
-          <article class="metric-card">
-            <p>Independent Share</p>
-            <strong id="independentWorkShare">0%</strong>
+            <p>Independent Work/Teacher Collaboration</p>
+            <strong id="collaborationTime">00:00:00</strong>
+            <span id="collaborationShare" class="metric-detail">0%</span>
           </article>
         </div>
 
         <div class="progress-panel">
           <div class="progress-copy">
-            <span id="instructionStatus">Direct instruction is currently paused.</span>
-            <span id="segmentCount">0 instruction segments recorded</span>
+            <span id="instructionStatus">All teaching modes are currently paused.</span>
+            <span id="segmentCount">Direct: 0 | Independent: 0 | Collaboration: 0</span>
           </div>
           <div class="progress-track" aria-hidden="true">
-            <div id="instructionProgress" class="progress-fill"></div>
+            <div id="instructionProgress" class="progress-fill direct"></div>
             <div id="independentProgress" class="progress-fill independent"></div>
+            <div id="collaborationProgress" class="progress-fill collaboration"></div>
           </div>
         </div>
       </section>
@@ -103,18 +149,18 @@
         </div>
 
         <div class="tool-selector" role="group" aria-label="Event type selector">
-          <button type="button" class="tool-button active" data-tool="question">Question</button>
+          <button type="button" class="tool-button active" data-tool="question">Question/Response</button>
           <button type="button" class="tool-button" data-tool="disruption">Disruption</button>
           <button type="button" class="tool-button" data-tool="teacherMovement">Teacher movement</button>
         </div>
 
         <div class="room-frame">
           <div class="room-front">Front of room</div>
-          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question, disruption or teacher movement.</p>
+          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question/response, disruption or teacher movement.</p>
           <div
             id="heatmapSurface"
             class="heatmap-surface"
-            aria-label="Tap anywhere in the classroom to log a question, disruption or teacher movement"
+            aria-label="Tap anywhere in the classroom to log a question/response, disruption or teacher movement"
             role="button"
             tabindex="0"
           >
@@ -141,7 +187,7 @@
             <div id="heatmapOverlay" class="heatmap-overlay" aria-hidden="true"></div>
           </div>
           <div class="legend">
-            <span><i class="legend-swatch question"></i> Question activity</span>
+            <span><i class="legend-swatch question"></i> Question/response activity</span>
             <span><i class="legend-swatch disruption"></i> Disruption activity</span>
             <span><i class="legend-swatch teacherMovement"></i> Teacher movement</span>
           </div>
@@ -242,6 +288,26 @@
     </main>
   </div>
 
-  <script src="app.js?v=20260521-1"></script>
+  <div id="routinesGuideModal" class="modal-shell" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="routinesGuideTitle">
+      <div class="modal-header">
+        <div>
+          <p class="section-label">Safe and Orderly Routines</p>
+          <h2 id="routinesGuideTitle">Reference guide</h2>
+        </div>
+        <button id="closeRoutinesGuide" type="button" class="ghost-button modal-close">Close</button>
+      </div>
+      <div class="modal-body">
+        <img
+          class="routine-guide-image"
+          src="Safe_Orderly_Routines.png"
+          alt="Safe and Orderly Routines reference guide"
+        >
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js?v=20260524-3"></script>
 </body>
 </html>
