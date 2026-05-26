@@ -141,6 +141,10 @@
             <span>Teacher movements logged</span>
             <strong id="teacherMovementTotal">0</strong>
           </article>
+          <article class="summary-card">
+            <span>Passive disengagement logged</span>
+            <strong id="passiveDisengagementTotal">0</strong>
+          </article>
         </div>
       </section>
 
@@ -156,15 +160,16 @@
           <button type="button" class="tool-button active" data-tool="question">Question/Response</button>
           <button type="button" class="tool-button" data-tool="disruption">Disruption</button>
           <button type="button" class="tool-button" data-tool="teacherMovement">Teacher movement</button>
+          <button type="button" class="tool-button" data-tool="passiveDisengagement">Passive disengagement</button>
         </div>
 
         <div class="room-frame">
           <div class="room-front">Front of room</div>
-          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question/response, disruption or teacher movement.</p>
+          <p id="tapHint" class="tap-hint">Tap anywhere in the room to log a question/response, disruption, teacher movement or passive disengagement.</p>
           <div
             id="heatmapSurface"
             class="heatmap-surface"
-            aria-label="Tap anywhere in the classroom to log a question/response, disruption or teacher movement"
+            aria-label="Tap anywhere in the classroom to log a question/response, disruption, teacher movement or passive disengagement"
             role="button"
             tabindex="0"
           >
@@ -194,6 +199,7 @@
             <span><i class="legend-swatch question"></i> Question/response activity</span>
             <span><i class="legend-swatch disruption"></i> Disruption activity</span>
             <span><i class="legend-swatch teacherMovement"></i> Teacher movement</span>
+            <span><i class="legend-swatch passiveDisengagement"></i> Passive disengagement</span>
           </div>
         </div>
       </section>
@@ -312,6 +318,6 @@
     </section>
   </div>
 
-  <script src="app.js?v=20260524-4"></script>
+  <script src="app.js?v=20260526-2"></script>
 </body>
 </html>

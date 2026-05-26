@@ -3,6 +3,7 @@ const TOOL_TYPES = {
   question: "Question/Response",
   disruption: "Disruption",
   teacherMovement: "Teacher movement",
+  passiveDisengagement: "Passive disengagement",
 };
 const PDF_PAGE_WIDTH = 1191;
 const PDF_PAGE_HEIGHT = 842;
@@ -19,6 +20,7 @@ const PDF_COLORS = {
   cyan: [0.22, 0.741, 0.973],
   orange: [0.961, 0.62, 0.043],
   red: [0.973, 0.443, 0.443],
+  yellow: [0.98, 0.8, 0.12],
   slate: [0.875, 0.906, 0.941],
   darkSlate: [0.19, 0.28, 0.36],
   white: [1, 1, 1],
@@ -69,6 +71,7 @@ const collaborationProgress = document.getElementById("collaborationProgress");
 const questionTotal = document.getElementById("questionTotal");
 const disruptionTotal = document.getElementById("disruptionTotal");
 const teacherMovementTotal = document.getElementById("teacherMovementTotal");
+const passiveDisengagementTotal = document.getElementById("passiveDisengagementTotal");
 const questionRate = document.getElementById("questionRate");
 const disruptionRate = document.getElementById("disruptionRate");
 const directEventShare = document.getElementById("directEventShare");
@@ -82,6 +85,10 @@ function getEventColor(type) {
 
   if (type === "disruption") {
     return PDF_COLORS.red;
+  }
+
+  if (type === "passiveDisengagement") {
+    return PDF_COLORS.yellow;
   }
 
   return PDF_COLORS.green;
@@ -444,8 +451,7 @@ function buildPdfHeatmapClusters(roomX, roomY, roomWidth, roomHeight) {
   const clusterDistance = 18;
   const clusters = [];
 
-  state.events
-    .slice(0, 80)
+  [...state.events]
     .reverse()
     .forEach((event) => {
       if (!event.point) {
@@ -827,13 +833,29 @@ function drawPdfHeatmap(page, x, y, width, height) {
   const questionMid = mixPdfColors(PDF_COLORS.blue, PDF_COLORS.white, 0.42);
   const disruptionOuter = mixPdfColors(PDF_COLORS.red, PDF_COLORS.white, 0.72);
   const disruptionMid = mixPdfColors(PDF_COLORS.red, PDF_COLORS.white, 0.42);
+  const passiveOuter = mixPdfColors(PDF_COLORS.yellow, PDF_COLORS.white, 0.72);
+  const passiveMid = mixPdfColors(PDF_COLORS.yellow, PDF_COLORS.white, 0.42);
   const clusters = buildPdfHeatmapClusters(roomX, roomY, roomWidth, roomHeight);
 
   clusters.forEach((cluster) => {
     const markerColor = getEventColor(cluster.type);
     const isTeacherMovement = cluster.type === "teacherMovement";
-    const outerColor = cluster.type === "question" ? questionOuter : cluster.type === "disruption" ? disruptionOuter : null;
-    const midColor = cluster.type === "question" ? questionMid : cluster.type === "disruption" ? disruptionMid : null;
+    const outerColor =
+      cluster.type === "question"
+        ? questionOuter
+        : cluster.type === "disruption"
+          ? disruptionOuter
+          : cluster.type === "passiveDisengagement"
+            ? passiveOuter
+            : null;
+    const midColor =
+      cluster.type === "question"
+        ? questionMid
+        : cluster.type === "disruption"
+          ? disruptionMid
+          : cluster.type === "passiveDisengagement"
+            ? passiveMid
+            : null;
     const countRadiusBoost = Math.min(8, (cluster.count - 1) * 1.4);
     const outerRadius = 13 + countRadiusBoost;
     const midRadius = 8 + Math.min(5, (cluster.count - 1) * 0.9);
@@ -894,6 +916,13 @@ function drawPdfHeatmap(page, x, y, width, height) {
     width: 130,
   });
   drawPdfCircle(page, x + 304, y + height - 8, 6, { fillColor: PDF_COLORS.green });
+  drawPdfText(page, x + 420, y + height - 28, "Passive disengagement", {
+    size: 10,
+    color: PDF_COLORS.muted,
+    maxChars: 24,
+    width: 150,
+  });
+  drawPdfCircle(page, x + 426, y + height - 8, 6, { fillColor: PDF_COLORS.yellow });
 }
 
 function getTimelineData(observationMs) {
@@ -1207,6 +1236,10 @@ async function captureHeatmapSnapshot() {
 
     .heat-glow.disruption {
       background: radial-gradient(circle, rgba(248, 113, 113, 0.54), rgba(248, 113, 113, 0.04) 72%) !important;
+    }
+
+    .heat-glow.passiveDisengagement {
+      background: radial-gradient(circle, rgba(250, 204, 21, 0.58), rgba(250, 204, 21, 0.04) 72%) !important;
     }
 
     .event-marker {
@@ -1854,10 +1887,11 @@ function downloadStructuredPdfReport(now = Date.now()) {
   });
   drawPdfSectionHeading(pageOne, snapshotX + 16, topY + 16, "Lesson Snapshot");
   const snapshotCardGap = 8;
-  const snapshotCardWidth = (snapshotWidth - 32 - snapshotCardGap * 2) / 3;
+  const snapshotCardWidth = (snapshotWidth - 32 - snapshotCardGap * 3) / 4;
   drawPdfMetricCard(pageOne, snapshotX + 16, topY + 46, snapshotCardWidth, 72, "Questions logged", String(totals.question), PDF_COLORS.blue);
   drawPdfMetricCard(pageOne, snapshotX + 16 + snapshotCardWidth + snapshotCardGap, topY + 46, snapshotCardWidth, 72, "Disruptions logged", String(totals.disruption), PDF_COLORS.red);
   drawPdfMetricCard(pageOne, snapshotX + 16 + (snapshotCardWidth + snapshotCardGap) * 2, topY + 46, snapshotCardWidth, 72, "Teacher movements", String(totals.teacherMovement), PDF_COLORS.green);
+  drawPdfMetricCard(pageOne, snapshotX + 16 + (snapshotCardWidth + snapshotCardGap) * 3, topY + 46, snapshotCardWidth, 72, "Passive disengagement", String(totals.passiveDisengagement), PDF_COLORS.yellow);
   drawPdfText(pageOne, snapshotX + 16, topY + 128, `Total logged events: ${state.events.length}`, {
     size: 10,
     color: PDF_COLORS.muted,
@@ -2120,7 +2154,7 @@ function getTotals() {
       totals[event.type] += 1;
       return totals;
     },
-    { question: 0, disruption: 0, teacherMovement: 0 }
+    { question: 0, disruption: 0, teacherMovement: 0, passiveDisengagement: 0 }
   );
 }
 
@@ -2174,11 +2208,11 @@ function resetSession() {
 
 function buildHeatmap() {
   heatmapOverlay.innerHTML = "";
+  const orderedEvents = [...state.events].reverse();
+  const glowFragment = document.createDocumentFragment();
+  const markerFragment = document.createDocumentFragment();
 
-  state.events
-    .slice(0, 80)
-    .reverse()
-    .forEach((event) => {
+  orderedEvents.forEach((event) => {
       if (!event.point) {
         return;
       }
@@ -2191,13 +2225,10 @@ function buildHeatmap() {
       glow.className = `heat-glow ${event.type}`;
       glow.style.left = `${event.point.xPercent}%`;
       glow.style.top = `${event.point.yPercent}%`;
-      heatmapOverlay.appendChild(glow);
+      glowFragment.appendChild(glow);
     });
 
-  state.events
-    .slice(0, 80)
-    .reverse()
-    .forEach((event) => {
+  orderedEvents.forEach((event) => {
       if (!event.point) {
         return;
       }
@@ -2206,8 +2237,10 @@ function buildHeatmap() {
       marker.className = `event-marker ${event.type}`;
       marker.style.left = `${event.point.xPercent}%`;
       marker.style.top = `${event.point.yPercent}%`;
-      heatmapOverlay.appendChild(marker);
+      markerFragment.appendChild(marker);
     });
+
+  heatmapOverlay.append(glowFragment, markerFragment);
 }
 
 function handleSurfaceInteraction(clientX, clientY) {
@@ -2430,6 +2463,9 @@ function renderSummary(now = Date.now()) {
   if (teacherMovementTotal) {
     teacherMovementTotal.textContent = totals.teacherMovement;
   }
+  if (passiveDisengagementTotal) {
+    passiveDisengagementTotal.textContent = totals.passiveDisengagement;
+  }
   instructionProgress.style.width = `${Math.min(directShareExact, 100)}%`;
   instructionProgress.style.left = "0%";
   independentProgress.style.width = `${Math.min(independentShareExact, Math.max(0, 100 - directShareExact))}%`;
@@ -2472,7 +2508,8 @@ function renderToolState() {
   });
 
   tapHint.textContent = "Tap anywhere in the room to log a question/response, disruption or teacher movement.";
-  heatmapSurface.setAttribute("aria-label", "Tap anywhere in the classroom to log a question/response, disruption or teacher movement");
+  tapHint.textContent = "Tap anywhere in the room to log a question/response, disruption, teacher movement or passive disengagement.";
+  heatmapSurface.setAttribute("aria-label", "Tap anywhere in the classroom to log a question/response, disruption, teacher movement or passive disengagement");
 }
 
 function renderLog() {
