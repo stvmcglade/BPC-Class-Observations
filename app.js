@@ -15,6 +15,7 @@ const PDF_COLORS = {
   muted: [0.36, 0.43, 0.5],
   line: [0.8, 0.84, 0.88],
   green: [0.133, 0.773, 0.369],
+  teal: [0.176, 0.831, 0.749],
   amber: [0.961, 0.62, 0.043],
   blue: [0.376, 0.647, 0.98],
   cyan: [0.22, 0.741, 0.973],
@@ -28,6 +29,7 @@ const PDF_COLORS = {
 
 const observationToggle = document.getElementById("observationToggle");
 const directInstructionToggle = document.getElementById("directInstructionToggle");
+const collaborativeInstructionToggle = document.getElementById("collaborativeInstructionToggle");
 const independentWorkToggle = document.getElementById("independentWorkToggle");
 const collaborationToggle = document.getElementById("collaborationToggle");
 const endSessionDownloadButton = document.getElementById("endSessionDownload");
@@ -37,6 +39,8 @@ const undoLastEventButton = document.getElementById("undoLastEvent");
 const observationNotes = document.getElementById("observationNotes");
 const routineEntry = document.getElementById("routineEntry");
 const routineReady = document.getElementById("routineReady");
+const routineLearningIntention = document.getElementById("routineLearningIntention");
+const routineRetrieval = document.getElementById("routineRetrieval");
 const routineTidy = document.getElementById("routineTidy");
 const routineChairs = document.getElementById("routineChairs");
 const routineExit = document.getElementById("routineExit");
@@ -51,6 +55,8 @@ const toolButtons = [...document.querySelectorAll(".tool-button")];
 const routineInputs = [
   routineEntry,
   routineReady,
+  routineLearningIntention,
+  routineRetrieval,
   routineTidy,
   routineChairs,
   routineExit,
@@ -58,14 +64,17 @@ const routineInputs = [
 
 const observationTime = document.getElementById("observationTime");
 const directInstructionTime = document.getElementById("directInstructionTime");
+const collaborativeInstructionTime = document.getElementById("collaborativeInstructionTime");
 const independentWorkTime = document.getElementById("independentWorkTime");
 const collaborationTime = document.getElementById("collaborationTime");
 const directInstructionShare = document.getElementById("directInstructionShare");
+const collaborativeInstructionShare = document.getElementById("collaborativeInstructionShare");
 const independentWorkShare = document.getElementById("independentWorkShare");
 const collaborationShare = document.getElementById("collaborationShare");
 const instructionStatus = document.getElementById("instructionStatus");
 const segmentCount = document.getElementById("segmentCount");
 const instructionProgress = document.getElementById("instructionProgress");
+const collaborativeInstructionProgress = document.getElementById("collaborativeInstructionProgress");
 const independentProgress = document.getElementById("independentProgress");
 const collaborationProgress = document.getElementById("collaborationProgress");
 const questionTotal = document.getElementById("questionTotal");
@@ -104,6 +113,10 @@ function defaultState() {
     directStartedAt: null,
     directElapsedMs: 0,
     directSegments: 0,
+    collaborativeInstructionRunning: false,
+    collaborativeInstructionStartedAt: null,
+    collaborativeInstructionElapsedMs: 0,
+    collaborativeInstructionSegments: 0,
     independentRunning: false,
     independentStartedAt: null,
     independentElapsedMs: 0,
@@ -116,6 +129,8 @@ function defaultState() {
     routines: {
       entry: false,
       ready: false,
+      learningIntention: false,
+      retrieval: false,
       tidy: false,
       chairs: false,
       exit: false,
@@ -614,6 +629,33 @@ function drawPdfMetricCard(page, x, y, width, height, label, value, accentColor,
   }
 }
 
+function drawPdfInstructionModeCard(page, x, y, width, height, label, percentage, timing, accentColor) {
+  drawPdfRect(page, x, y, width, height, {
+    fillColor: PDF_COLORS.panelStrong,
+    strokeColor: PDF_COLORS.line,
+  });
+  drawPdfText(page, x + 12, y + 12, label, {
+    size: 9,
+    color: PDF_COLORS.muted,
+    maxChars: 26,
+    width: width - 24,
+    lineHeight: 11,
+  });
+  drawPdfText(page, x + 12, y + 30, percentage, {
+    size: 22,
+    bold: true,
+    color: accentColor,
+    maxChars: 8,
+    width: width - 24,
+  });
+  drawPdfText(page, x + 12, y + 56, timing, {
+    size: 9,
+    color: PDF_COLORS.text,
+    maxChars: 22,
+    width: width - 24,
+  });
+}
+
 function drawPdfSectionHeading(page, x, y, title) {
   drawPdfText(page, x, y, title, { size: 15, bold: true, color: PDF_COLORS.text, maxChars: 40, width: 500 });
 }
@@ -688,6 +730,11 @@ function drawPdfRoutinesSection(page, x, y, width, height) {
   });
   drawPdfCheckbox(page, leftX + 12, groupY + 24, state.routines.entry, "Safe and Orderly Entry", checkboxOptions);
   drawPdfCheckbox(page, leftX + 12, groupY + 42, state.routines.ready, "Ready to Learn", checkboxOptions);
+  drawPdfCheckbox(page, leftX + 12, groupY + 60, state.routines.learningIntention, "Learning Intention and Success Criteria", {
+    ...checkboxOptions,
+    maxChars: 24,
+  });
+  drawPdfCheckbox(page, leftX + 12, groupY + 78, state.routines.retrieval, "Retrieval task", checkboxOptions);
 
   drawPdfText(page, rightX + 12, groupY + 10, "End of Lesson", {
     size: 11,
@@ -949,7 +996,7 @@ function getTimelineData(observationMs) {
   return { bucketMinutes, buckets };
 }
 
-function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, directMs, independentMs, collaborationMs) {
+function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, directMs, collaborativeInstructionMs, independentMs, collaborationMs) {
   drawPdfRect(page, x, y, width, height, {
     fillColor: PDF_COLORS.white,
     strokeColor: PDF_COLORS.line,
@@ -961,7 +1008,7 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
     maxChars: 32,
     width: width - 28,
   });
-  drawPdfText(page, x + 14, y + 34, "Compare the observed lesson time with direct instruction, independent work, and teacher collaboration.", {
+  drawPdfText(page, x + 14, y + 34, "Compare the observed lesson time across direct, collaborative, independent, and teacher collaboration modes.", {
     size: 10,
     color: PDF_COLORS.muted,
     maxChars: 62,
@@ -972,17 +1019,20 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
   const chartY = y + 78;
   const barWidth = width - 28;
   const barX = x + 14;
-  const otherMs = Math.max(0, observationMs - directMs - independentMs - collaborationMs);
+  const otherMs = Math.max(0, observationMs - directMs - collaborativeInstructionMs - independentMs - collaborationMs);
   const directShare = observationMs === 0 ? 0 : directMs / observationMs;
+  const collaborativeInstructionShareValue = observationMs === 0 ? 0 : collaborativeInstructionMs / observationMs;
   const independentShare = observationMs === 0 ? 0 : independentMs / observationMs;
   const collaborationShareValue = observationMs === 0 ? 0 : collaborationMs / observationMs;
-  const otherShare = Math.max(0, 1 - directShare - independentShare - collaborationShareValue);
+  const otherShare = Math.max(0, 1 - directShare - collaborativeInstructionShareValue - independentShare - collaborationShareValue);
   const directWidth = barWidth * directShare;
+  const collaborativeInstructionWidth = barWidth * collaborativeInstructionShareValue;
   const independentWidth = barWidth * independentShare;
   const collaborationWidth = barWidth * collaborationShareValue;
   const metricY = chartY + 30;
   const metricGap = 10;
-  const metricWidth = (width - 28 - metricGap * 3) / 4;
+  const metricWidth = (width - 28 - metricGap * 2) / 3;
+  const secondMetricY = metricY + 44;
 
   drawPdfRect(page, barX, chartY, barWidth, 18, {
     fillColor: PDF_COLORS.slate,
@@ -994,14 +1044,20 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
     });
   }
 
+  if (collaborativeInstructionWidth > 0) {
+    drawPdfRect(page, barX + directWidth, chartY, collaborativeInstructionWidth, 18, {
+      fillColor: PDF_COLORS.teal,
+    });
+  }
+
   if (independentWidth > 0) {
-    drawPdfRect(page, barX + directWidth, chartY, independentWidth, 18, {
+    drawPdfRect(page, barX + directWidth + collaborativeInstructionWidth, chartY, independentWidth, 18, {
       fillColor: PDF_COLORS.cyan,
     });
   }
 
   if (collaborationWidth > 0) {
-    drawPdfRect(page, barX + directWidth + independentWidth, chartY, collaborationWidth, 18, {
+    drawPdfRect(page, barX + directWidth + collaborativeInstructionWidth + independentWidth, chartY, collaborationWidth, 18, {
       fillColor: PDF_COLORS.orange,
     });
   }
@@ -1036,16 +1092,16 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 7, "Independent work", {
+  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 7, "Collaborative instruction", {
     size: 9,
     color: PDF_COLORS.muted,
-    maxChars: 24,
+    maxChars: 28,
     width: metricWidth - 20,
   });
-  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 19, `${formatMinutes(independentMs)} (${Math.round(independentShare * 100)}%)`, {
+  drawPdfText(page, barX + metricWidth + metricGap + 10, metricY + 19, `${formatMinutes(collaborativeInstructionMs)} (${Math.round(collaborativeInstructionShareValue * 100)}%)`, {
     size: 10,
     bold: true,
-    color: PDF_COLORS.cyan,
+    color: PDF_COLORS.teal,
     maxChars: 30,
     width: metricWidth - 20,
   });
@@ -1054,13 +1110,31 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfText(page, barX + (metricWidth + metricGap) * 2 + 10, metricY + 7, "Teacher collaboration", {
+  drawPdfText(page, barX + (metricWidth + metricGap) * 2 + 10, metricY + 7, "Independent work", {
+    size: 9,
+    color: PDF_COLORS.muted,
+    maxChars: 24,
+    width: metricWidth - 20,
+  });
+  drawPdfText(page, barX + (metricWidth + metricGap) * 2 + 10, metricY + 19, `${formatMinutes(independentMs)} (${Math.round(independentShare * 100)}%)`, {
+    size: 10,
+    bold: true,
+    color: PDF_COLORS.cyan,
+    maxChars: 30,
+    width: metricWidth - 20,
+  });
+
+  drawPdfRect(page, barX, secondMetricY, metricWidth, 34, {
+    fillColor: PDF_COLORS.panel,
+    strokeColor: PDF_COLORS.line,
+  });
+  drawPdfText(page, barX + 10, secondMetricY + 7, "Teacher collaboration", {
     size: 9,
     color: PDF_COLORS.muted,
     maxChars: 26,
     width: metricWidth - 20,
   });
-  drawPdfText(page, barX + (metricWidth + metricGap) * 2 + 10, metricY + 19, `${formatMinutes(collaborationMs)} (${Math.round(collaborationShareValue * 100)}%)`, {
+  drawPdfText(page, barX + 10, secondMetricY + 19, `${formatMinutes(collaborationMs)} (${Math.round(collaborationShareValue * 100)}%)`, {
     size: 10,
     bold: true,
     color: PDF_COLORS.orange,
@@ -1068,17 +1142,17 @@ function drawPdfTimeBreakdownChart(page, x, y, width, height, observationMs, dir
     width: metricWidth - 20,
   });
 
-  drawPdfRect(page, barX + (metricWidth + metricGap) * 3, metricY, metricWidth, 34, {
+  drawPdfRect(page, barX + metricWidth + metricGap, secondMetricY, metricWidth, 34, {
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfText(page, barX + (metricWidth + metricGap) * 3 + 10, metricY + 7, "Other observation time", {
+  drawPdfText(page, barX + metricWidth + metricGap + 10, secondMetricY + 7, "Other observation time", {
     size: 9,
     color: PDF_COLORS.muted,
     maxChars: 26,
     width: metricWidth - 20,
   });
-  drawPdfText(page, barX + (metricWidth + metricGap) * 3 + 10, metricY + 19, `${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)`, {
+  drawPdfText(page, barX + metricWidth + metricGap + 10, secondMetricY + 19, `${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)`, {
     size: 10,
     bold: true,
     color: PDF_COLORS.darkSlate,
@@ -1329,7 +1403,7 @@ function drawPdfEventLogSection(page, x, y, width, height) {
   }
 }
 
-function drawPdfLiveDashboardSection(page, x, y, width, height, observationMs, directMs, independentMs, collaborationMs, questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue) {
+function drawPdfLiveDashboardSection(page, x, y, width, height, observationMs, directMs, collaborativeInstructionMs, independentMs, collaborationMs, questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue) {
   drawPdfRect(page, x, y, width, height, {
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
@@ -1354,11 +1428,11 @@ function drawPdfLiveDashboardSection(page, x, y, width, height, observationMs, d
 
   const chartWidth = width - 32;
   const firstChartY = y + 138;
-  const firstChartHeight = 156;
+  const firstChartHeight = 172;
   const chartGap = 16;
   const secondChartY = firstChartY + firstChartHeight + chartGap;
   const secondChartHeight = height - (secondChartY - y) - 16;
-  drawPdfTimeBreakdownChart(page, x + 16, firstChartY, chartWidth, firstChartHeight, observationMs, directMs, independentMs, collaborationMs);
+  drawPdfTimeBreakdownChart(page, x + 16, firstChartY, chartWidth, firstChartHeight, observationMs, directMs, collaborativeInstructionMs, independentMs, collaborationMs);
   drawPdfTimelineChart(page, x + 16, secondChartY, chartWidth, secondChartHeight, observationMs);
 }
 
@@ -1817,22 +1891,24 @@ async function buildA3ReportPdfBlob(now = Date.now()) {
 function downloadStructuredPdfReport(now = Date.now()) {
   const observationMs = getObservationElapsed(now);
   const directMs = getDirectElapsed(now);
+  const collaborativeInstructionMs = getCollaborativeInstructionElapsed(now);
   const independentMs = getIndependentElapsed(now);
   const collaborationMs = getCollaborationElapsed(now);
   const totals = getTotals();
   const { questionPer5, disruptionPer5, directEvents, totalEvents, directShareValue } = getSessionAnalytics(now);
   const generatedAt = new Date(now).toLocaleString();
   const directInstructionShareValue = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
+  const collaborativeInstructionShareValue = observationMs === 0 ? 0 : Math.round((collaborativeInstructionMs / observationMs) * 100);
   const independentWorkShareValue = observationMs === 0 ? 0 : Math.round((independentMs / observationMs) * 100);
   const collaborationShareValue = observationMs === 0 ? 0 : Math.round((collaborationMs / observationMs) * 100);
   const routinesY = 78;
-  const routinesHeight = 132;
+  const routinesHeight = 148;
   const sectionGap = 18;
   const topY = routinesY + routinesHeight + sectionGap;
-  const topHeight = 188;
-  const lowerY = topY + topHeight + sectionGap;
+  const topHeight = 254;
   const pageMargin = 28;
-  const heatmapHeight = PDF_PAGE_HEIGHT - lowerY - pageMargin;
+  const heatmapPageY = 78;
+  const heatmapPageHeight = PDF_PAGE_HEIGHT - heatmapPageY - pageMargin;
   const notesSectionY = 78;
   const notesSectionHeight = PDF_PAGE_HEIGHT - notesSectionY - pageMargin;
   const noteSectionWidth = PDF_PAGE_WIDTH - 56;
@@ -1843,10 +1919,11 @@ function downloadStructuredPdfReport(now = Date.now()) {
     noteSectionWidth,
     notesSectionHeight
   );
-  const totalPages = 2 + notePages.chunks.length;
+  const totalPages = 3 + notePages.chunks.length;
   const pdfPages = Array.from({ length: totalPages }, () => createPdfPage());
   const pageOne = pdfPages[0];
   const pageTwo = pdfPages[1];
+  const pageThree = pdfPages[2];
 
   pdfPages.forEach((page, index) => {
     drawPdfReportHeader(page, generatedAt, `Page ${index + 1} of ${totalPages}`);
@@ -1864,17 +1941,21 @@ function downloadStructuredPdfReport(now = Date.now()) {
     strokeColor: PDF_COLORS.line,
   });
   drawPdfSectionHeading(pageOne, instructionX + 16, topY + 16, "Instruction Timing");
-  drawPdfMetricCard(pageOne, instructionX + 16, topY + 46, 126, 72, "Observation Time", formatDuration(observationMs), PDF_COLORS.text);
-  drawPdfMetricCard(pageOne, instructionX + 156, topY + 46, 126, 72, "Direct Instruction", formatDuration(directMs), PDF_COLORS.green, `${directInstructionShareValue}%`);
-  drawPdfMetricCard(pageOne, instructionX + 296, topY + 46, 126, 72, "Independent Work", formatDuration(independentMs), PDF_COLORS.cyan, `${independentWorkShareValue}%`);
-  drawPdfMetricCard(pageOne, instructionX + 436, topY + 46, 108, 72, "Teacher Collaboration", formatDuration(collaborationMs), PDF_COLORS.orange, `${collaborationShareValue}%`);
-  drawPdfText(pageOne, instructionX + 16, topY + 136, instructionStatus.textContent, {
+  const instructionCardGap = 12;
+  const instructionTopCardWidth = (instructionWidth - 32 - instructionCardGap * 2) / 3;
+  const instructionBottomCardWidth = (instructionWidth - 32 - instructionCardGap) / 2;
+  drawPdfMetricCard(pageOne, instructionX + 16, topY + 46, instructionTopCardWidth, 68, "Observation Time", formatDuration(observationMs), PDF_COLORS.text);
+  drawPdfInstructionModeCard(pageOne, instructionX + 16 + instructionTopCardWidth + instructionCardGap, topY + 46, instructionTopCardWidth, 68, "Direct Instruction", `${directInstructionShareValue}%`, formatDuration(directMs), PDF_COLORS.green);
+  drawPdfInstructionModeCard(pageOne, instructionX + 16 + (instructionTopCardWidth + instructionCardGap) * 2, topY + 46, instructionTopCardWidth, 68, "Collaborative Instruction", `${collaborativeInstructionShareValue}%`, formatDuration(collaborativeInstructionMs), PDF_COLORS.teal);
+  drawPdfInstructionModeCard(pageOne, instructionX + 16, topY + 126, instructionBottomCardWidth, 68, "Independent Work", `${independentWorkShareValue}%`, formatDuration(independentMs), PDF_COLORS.cyan);
+  drawPdfInstructionModeCard(pageOne, instructionX + 16 + instructionBottomCardWidth + instructionCardGap, topY + 126, instructionBottomCardWidth, 68, "Teacher Collaboration", `${collaborationShareValue}%`, formatDuration(collaborationMs), PDF_COLORS.orange);
+  drawPdfText(pageOne, instructionX + 16, topY + 212, instructionStatus.textContent, {
     size: 10,
     color: PDF_COLORS.muted,
     maxChars: 56,
     width: 280,
   });
-  drawPdfText(pageOne, instructionX + 300, topY + 136, segmentCount.textContent, {
+  drawPdfText(pageOne, instructionX + 300, topY + 212, segmentCount.textContent, {
     size: 10,
     color: PDF_COLORS.muted,
     maxChars: 48,
@@ -1900,29 +1981,30 @@ function downloadStructuredPdfReport(now = Date.now()) {
   });
 
   const heatmapWidth = PDF_PAGE_WIDTH - 56;
-  drawPdfRect(pageOne, instructionX, lowerY, heatmapWidth, heatmapHeight, {
+  drawPdfRect(pageTwo, instructionX, heatmapPageY, heatmapWidth, heatmapPageHeight, {
     fillColor: PDF_COLORS.panel,
     strokeColor: PDF_COLORS.line,
   });
-  drawPdfSectionHeading(pageOne, instructionX + 16, lowerY + 16, "Classroom Heatmap");
+  drawPdfSectionHeading(pageTwo, instructionX + 16, heatmapPageY + 16, "Classroom Heatmap");
   const heatmapBoxX = instructionX + 16;
-  const heatmapBoxY = lowerY + 46;
+  const heatmapBoxY = heatmapPageY + 46;
   const heatmapBoxWidth = heatmapWidth - 32;
-  const heatmapBoxHeight = heatmapHeight - 62;
-  drawPdfHeatmap(pageOne, heatmapBoxX, heatmapBoxY, heatmapBoxWidth, heatmapBoxHeight);
+  const heatmapBoxHeight = heatmapPageHeight - 62;
+  drawPdfHeatmap(pageTwo, heatmapBoxX, heatmapBoxY, heatmapBoxWidth, heatmapBoxHeight);
 
   const liveX = 28;
   const liveY = 78;
   const liveWidth = PDF_PAGE_WIDTH - 56;
   const liveHeight = PDF_PAGE_HEIGHT - liveY - 28;
   drawPdfLiveDashboardSection(
-    pageTwo,
+    pageThree,
     liveX,
     liveY,
     liveWidth,
     liveHeight,
     observationMs,
     directMs,
+    collaborativeInstructionMs,
     independentMs,
     collaborationMs,
     questionPer5,
@@ -1933,7 +2015,7 @@ function downloadStructuredPdfReport(now = Date.now()) {
   );
 
   notePages.chunks.forEach((noteChunk, index) => {
-    const continuationPage = pdfPages[index + 2];
+    const continuationPage = pdfPages[index + 3];
     drawPdfNotesSection(
       continuationPage,
       28,
@@ -1992,6 +2074,14 @@ function getIndependentElapsed(now = Date.now()) {
   return state.independentElapsedMs + (now - state.independentStartedAt);
 }
 
+function getCollaborativeInstructionElapsed(now = Date.now()) {
+  if (!state.collaborativeInstructionRunning || !state.collaborativeInstructionStartedAt) {
+    return state.collaborativeInstructionElapsedMs;
+  }
+
+  return state.collaborativeInstructionElapsedMs + (now - state.collaborativeInstructionStartedAt);
+}
+
 function getCollaborationElapsed(now = Date.now()) {
   if (!state.collaborationRunning || !state.collaborationStartedAt) {
     return state.collaborationElapsedMs;
@@ -2018,6 +2108,12 @@ function pauseIndependentWork(now = Date.now()) {
   state.independentStartedAt = null;
 }
 
+function pauseCollaborativeInstruction(now = Date.now()) {
+  state.collaborativeInstructionElapsedMs = getCollaborativeInstructionElapsed(now);
+  state.collaborativeInstructionRunning = false;
+  state.collaborativeInstructionStartedAt = null;
+}
+
 function pauseCollaboration(now = Date.now()) {
   state.collaborationElapsedMs = getCollaborationElapsed(now);
   state.collaborationRunning = false;
@@ -2036,6 +2132,10 @@ function toggleObservation() {
 
     if (state.independentRunning) {
       pauseIndependentWork(now);
+    }
+
+    if (state.collaborativeInstructionRunning) {
+      pauseCollaborativeInstruction(now);
     }
 
     if (state.collaborationRunning) {
@@ -2069,6 +2169,10 @@ function toggleDirectInstruction() {
       pauseIndependentWork(now);
     }
 
+    if (state.collaborativeInstructionRunning) {
+      pauseCollaborativeInstruction(now);
+    }
+
     if (state.collaborationRunning) {
       pauseCollaboration(now);
     }
@@ -2076,6 +2180,41 @@ function toggleDirectInstruction() {
     state.directRunning = true;
     state.directStartedAt = now;
     state.directSegments += 1;
+  }
+
+  saveState();
+  render();
+}
+
+function toggleCollaborativeInstruction() {
+  const now = Date.now();
+
+  if (!state.observationRunning) {
+    clearEndedSessionFlag();
+    state.observationRunning = true;
+    state.observationStartedAt = now;
+  }
+
+  if (state.collaborativeInstructionRunning) {
+    pauseCollaborativeInstruction(now);
+  } else {
+    clearEndedSessionFlag();
+
+    if (state.directRunning) {
+      pauseDirectInstruction(now);
+    }
+
+    if (state.independentRunning) {
+      pauseIndependentWork(now);
+    }
+
+    if (state.collaborationRunning) {
+      pauseCollaboration(now);
+    }
+
+    state.collaborativeInstructionRunning = true;
+    state.collaborativeInstructionStartedAt = now;
+    state.collaborativeInstructionSegments += 1;
   }
 
   saveState();
@@ -2098,6 +2237,10 @@ function toggleIndependentWork() {
 
     if (state.directRunning) {
       pauseDirectInstruction(now);
+    }
+
+    if (state.collaborativeInstructionRunning) {
+      pauseCollaborativeInstruction(now);
     }
 
     if (state.collaborationRunning) {
@@ -2129,6 +2272,10 @@ function toggleCollaboration() {
 
     if (state.directRunning) {
       pauseDirectInstruction(now);
+    }
+
+    if (state.collaborativeInstructionRunning) {
+      pauseCollaborativeInstruction(now);
     }
 
     if (state.independentRunning) {
@@ -2257,6 +2404,10 @@ async function endClassSession() {
     pauseDirectInstruction(now);
   }
 
+  if (state.collaborativeInstructionRunning) {
+    pauseCollaborativeInstruction(now);
+  }
+
   if (state.independentRunning) {
     pauseIndependentWork(now);
   }
@@ -2301,23 +2452,25 @@ function getBucketSizeMinutes(observationMs) {
   return 5;
 }
 
-function buildTimeBreakdownChart(observationMs, directMs, independentMs, collaborationMs) {
+function buildTimeBreakdownChart(observationMs, directMs, collaborativeInstructionMs, independentMs, collaborationMs) {
   if (observationMs <= 0) {
     return `
       <p class="chart-empty">Start the observation to build the lesson time comparison.</p>
     `;
   }
 
-  const otherMs = Math.max(0, observationMs - directMs - independentMs - collaborationMs);
+  const otherMs = Math.max(0, observationMs - directMs - collaborativeInstructionMs - independentMs - collaborationMs);
   const directShare = observationMs === 0 ? 0 : directMs / observationMs;
+  const collaborativeInstructionShareValue = observationMs === 0 ? 0 : collaborativeInstructionMs / observationMs;
   const independentShare = observationMs === 0 ? 0 : independentMs / observationMs;
   const collaborationShareValue = observationMs === 0 ? 0 : collaborationMs / observationMs;
-  const otherShare = Math.max(0, 1 - directShare - independentShare - collaborationShareValue);
+  const otherShare = Math.max(0, 1 - directShare - collaborativeInstructionShareValue - independentShare - collaborationShareValue);
   const barWidth = 420;
   const directWidth = Math.max(0, Math.round(barWidth * directShare));
+  const collaborativeInstructionWidth = Math.max(0, Math.round(barWidth * collaborativeInstructionShareValue));
   const independentWidth = Math.max(0, Math.round(barWidth * independentShare));
   const collaborationWidth = Math.max(0, Math.round(barWidth * collaborationShareValue));
-  const otherWidth = Math.max(0, barWidth - directWidth - independentWidth - collaborationWidth);
+  const otherWidth = Math.max(0, barWidth - directWidth - collaborativeInstructionWidth - independentWidth - collaborationWidth);
 
   return `
     <svg class="chart-svg" viewBox="0 0 520 260" role="img" aria-label="Lesson time breakdown">
@@ -2327,27 +2480,30 @@ function buildTimeBreakdownChart(observationMs, directMs, independentMs, collabo
 
       <rect x="34" y="102" width="${barWidth}" height="34" rx="17" fill="rgba(255, 255, 255, 0.08)"></rect>
       <rect x="34" y="102" width="${directWidth}" height="34" rx="17" fill="#22c55e"></rect>
-      <rect x="${34 + directWidth}" y="102" width="${independentWidth}" height="34" rx="17" fill="#38bdf8"></rect>
-      <rect x="${34 + directWidth + independentWidth}" y="102" width="${collaborationWidth}" height="34" rx="17" fill="#f59e0b"></rect>
-      <rect x="${34 + directWidth + independentWidth + collaborationWidth}" y="102" width="${otherWidth}" height="34" rx="17" fill="#2d4a5b"></rect>
+      <rect x="${34 + directWidth}" y="102" width="${collaborativeInstructionWidth}" height="34" rx="17" fill="#2dd4bf"></rect>
+      <rect x="${34 + directWidth + collaborativeInstructionWidth}" y="102" width="${independentWidth}" height="34" rx="17" fill="#38bdf8"></rect>
+      <rect x="${34 + directWidth + collaborativeInstructionWidth + independentWidth}" y="102" width="${collaborationWidth}" height="34" rx="17" fill="#f59e0b"></rect>
+      <rect x="${34 + directWidth + collaborativeInstructionWidth + independentWidth + collaborationWidth}" y="102" width="${otherWidth}" height="34" rx="17" fill="#2d4a5b"></rect>
 
       <circle cx="42" cy="150" r="6" fill="#22c55e"></circle>
-      <text x="56" y="155" font-size="14" fill="#9fb0c1">Direct instruction</text>
-      <text x="248" y="155" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(directMs)} (${Math.round(directShare * 100)}%)</text>
+      <text x="56" y="155" font-size="13" fill="#9fb0c1">Direct instruction</text>
+      <text x="248" y="155" font-size="13" font-weight="700" fill="#f3f7fb">${formatMinutes(directMs)} (${Math.round(directShare * 100)}%)</text>
 
-      <circle cx="42" cy="175" r="6" fill="#38bdf8"></circle>
-      <text x="56" y="180" font-size="14" fill="#9fb0c1">Independent work</text>
-      <text x="248" y="180" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(independentMs)} (${Math.round(independentShare * 100)}%)</text>
+      <circle cx="42" cy="172" r="6" fill="#2dd4bf"></circle>
+      <text x="56" y="177" font-size="13" fill="#9fb0c1">Collaborative instruction</text>
+      <text x="282" y="177" font-size="13" font-weight="700" fill="#f3f7fb">${formatMinutes(collaborativeInstructionMs)} (${Math.round(collaborativeInstructionShareValue * 100)}%)</text>
 
-      <circle cx="42" cy="200" r="6" fill="#f59e0b"></circle>
-      <text x="56" y="205" font-size="14" fill="#9fb0c1">Independent work/teacher collaboration</text>
-      <text x="348" y="205" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(collaborationMs)} (${Math.round(collaborationShareValue * 100)}%)</text>
+      <circle cx="42" cy="194" r="6" fill="#38bdf8"></circle>
+      <text x="56" y="199" font-size="13" fill="#9fb0c1">Independent work</text>
+      <text x="248" y="199" font-size="13" font-weight="700" fill="#f3f7fb">${formatMinutes(independentMs)} (${Math.round(independentShare * 100)}%)</text>
 
-      <circle cx="42" cy="225" r="6" fill="#2d4a5b"></circle>
-      <text x="56" y="230" font-size="14" fill="#9fb0c1">Other observation time</text>
-      <text x="248" y="230" font-size="14" font-weight="700" fill="#f3f7fb">${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)</text>
+      <circle cx="42" cy="216" r="6" fill="#f59e0b"></circle>
+      <text x="56" y="221" font-size="13" fill="#9fb0c1">Independent work/teacher collaboration</text>
+      <text x="348" y="221" font-size="13" font-weight="700" fill="#f3f7fb">${formatMinutes(collaborationMs)} (${Math.round(collaborationShareValue * 100)}%)</text>
 
-      <text x="34" y="248" font-size="11" fill="#9fb0c1">The bar updates continuously, so you can compare direct instruction, independent work, collaboration, and the rest of the lesson at a glance.</text>
+      <circle cx="42" cy="238" r="6" fill="#2d4a5b"></circle>
+      <text x="56" y="243" font-size="13" fill="#9fb0c1">Other observation time</text>
+      <text x="248" y="243" font-size="13" font-weight="700" fill="#f3f7fb">${formatMinutes(otherMs)} (${Math.round(otherShare * 100)}%)</text>
     </svg>
   `;
 }
@@ -2418,6 +2574,7 @@ function buildTimelineChart(observationMs) {
 function renderAnalytics(now = Date.now()) {
   const observationMs = getObservationElapsed(now);
   const directMs = getDirectElapsed(now);
+  const collaborativeInstructionMs = getCollaborativeInstructionElapsed(now);
   const independentMs = getIndependentElapsed(now);
   const collaborationMs = getCollaborationElapsed(now);
   const sessionEnded = hasEndedSession();
@@ -2433,29 +2590,34 @@ function renderAnalytics(now = Date.now()) {
     directEventShare.textContent = "--";
   }
 
-  timeBreakdownChart.innerHTML = buildTimeBreakdownChart(observationMs, directMs, independentMs, collaborationMs);
+  timeBreakdownChart.innerHTML = buildTimeBreakdownChart(observationMs, directMs, collaborativeInstructionMs, independentMs, collaborationMs);
   timelineChart.innerHTML = buildTimelineChart(observationMs);
 }
 
 function renderSummary(now = Date.now()) {
   const observationMs = getObservationElapsed(now);
   const directMs = getDirectElapsed(now);
+  const collaborativeInstructionMs = getCollaborativeInstructionElapsed(now);
   const independentMs = getIndependentElapsed(now);
   const collaborationMs = getCollaborationElapsed(now);
   const totals = getTotals();
   const directShareExact = observationMs === 0 ? 0 : (directMs / observationMs) * 100;
+  const collaborativeInstructionShareExact = observationMs === 0 ? 0 : (collaborativeInstructionMs / observationMs) * 100;
   const independentShareExact = observationMs === 0 ? 0 : (independentMs / observationMs) * 100;
   const collaborationShareExact = observationMs === 0 ? 0 : (collaborationMs / observationMs) * 100;
   const directShare = observationMs === 0 ? 0 : Math.round((directMs / observationMs) * 100);
+  const collaborativeInstructionShareValue = observationMs === 0 ? 0 : Math.round((collaborativeInstructionMs / observationMs) * 100);
   const independentShare = observationMs === 0 ? 0 : Math.round((independentMs / observationMs) * 100);
   const collaborationShareValue = observationMs === 0 ? 0 : Math.round((collaborationMs / observationMs) * 100);
   const sessionEnded = hasEndedSession();
 
   observationTime.textContent = formatDuration(observationMs);
   directInstructionTime.textContent = formatDuration(directMs);
+  collaborativeInstructionTime.textContent = formatDuration(collaborativeInstructionMs);
   independentWorkTime.textContent = formatDuration(independentMs);
   collaborationTime.textContent = formatDuration(collaborationMs);
   directInstructionShare.textContent = `${directShare}%`;
+  collaborativeInstructionShare.textContent = `${collaborativeInstructionShareValue}%`;
   independentWorkShare.textContent = `${independentShare}%`;
   collaborationShare.textContent = `${collaborationShareValue}%`;
   questionTotal.textContent = totals.question;
@@ -2468,14 +2630,18 @@ function renderSummary(now = Date.now()) {
   }
   instructionProgress.style.width = `${Math.min(directShareExact, 100)}%`;
   instructionProgress.style.left = "0%";
-  independentProgress.style.width = `${Math.min(independentShareExact, Math.max(0, 100 - directShareExact))}%`;
-  independentProgress.style.left = `${Math.min(directShareExact, 100)}%`;
-  collaborationProgress.style.width = `${Math.min(collaborationShareExact, Math.max(0, 100 - directShareExact - independentShareExact))}%`;
-  collaborationProgress.style.left = `${Math.min(directShareExact + independentShareExact, 100)}%`;
+  collaborativeInstructionProgress.style.width = `${Math.min(collaborativeInstructionShareExact, Math.max(0, 100 - directShareExact))}%`;
+  collaborativeInstructionProgress.style.left = `${Math.min(directShareExact, 100)}%`;
+  independentProgress.style.width = `${Math.min(independentShareExact, Math.max(0, 100 - directShareExact - collaborativeInstructionShareExact))}%`;
+  independentProgress.style.left = `${Math.min(directShareExact + collaborativeInstructionShareExact, 100)}%`;
+  collaborationProgress.style.width = `${Math.min(collaborationShareExact, Math.max(0, 100 - directShareExact - collaborativeInstructionShareExact - independentShareExact))}%`;
+  collaborationProgress.style.left = `${Math.min(directShareExact + collaborativeInstructionShareExact + independentShareExact, 100)}%`;
   segmentCount.textContent =
-    `Direct: ${state.directSegments} | Independent: ${state.independentSegments} | Collaboration: ${state.collaborationSegments}`;
+    `Direct: ${state.directSegments} | Collaborative: ${state.collaborativeInstructionSegments} | Independent: ${state.independentSegments} | Teacher Collaboration: ${state.collaborationSegments}`;
   instructionStatus.textContent = state.directRunning
     ? "Direct instruction is running right now."
+    : state.collaborativeInstructionRunning
+      ? "Collaborative instruction is running right now."
     : state.independentRunning
       ? "Independent work is running right now."
       : state.collaborationRunning
@@ -2485,6 +2651,8 @@ function renderSummary(now = Date.now()) {
   observationToggle.textContent = state.observationRunning ? "Pause Observation" : "Start Observation";
   directInstructionToggle.textContent = state.directRunning ? "Pause Direct Instruction" : "Start Direct Instruction";
   directInstructionToggle.classList.toggle("running", state.directRunning);
+  collaborativeInstructionToggle.textContent = state.collaborativeInstructionRunning ? "Pause Collaborative Instruction" : "Start Collaborative Instruction";
+  collaborativeInstructionToggle.classList.toggle("running", state.collaborativeInstructionRunning);
   independentWorkToggle.textContent = state.independentRunning ? "Pause Independent Work" : "Start Independent Work";
   independentWorkToggle.classList.toggle("running", state.independentRunning);
   collaborationToggle.textContent = state.collaborationRunning
@@ -2507,7 +2675,6 @@ function renderToolState() {
     button.classList.toggle("active", isActive);
   });
 
-  tapHint.textContent = "Tap anywhere in the room to log a question/response, disruption or teacher movement.";
   tapHint.textContent = "Tap anywhere in the room to log a question/response, disruption, teacher movement or passive disengagement.";
   heatmapSurface.setAttribute("aria-label", "Tap anywhere in the classroom to log a question/response, disruption, teacher movement or passive disengagement");
 }
@@ -2580,6 +2747,14 @@ function renderRoutines() {
     routineReady.checked = Boolean(state.routines.ready);
   }
 
+  if (routineLearningIntention) {
+    routineLearningIntention.checked = Boolean(state.routines.learningIntention);
+  }
+
+  if (routineRetrieval) {
+    routineRetrieval.checked = Boolean(state.routines.retrieval);
+  }
+
   if (routineTidy) {
     routineTidy.checked = Boolean(state.routines.tidy);
   }
@@ -2628,6 +2803,7 @@ heatmapSurface.addEventListener("keydown", (event) => {
 
 observationToggle.addEventListener("click", toggleObservation);
 directInstructionToggle.addEventListener("click", toggleDirectInstruction);
+collaborativeInstructionToggle.addEventListener("click", toggleCollaborativeInstruction);
 independentWorkToggle.addEventListener("click", toggleIndependentWork);
 collaborationToggle.addEventListener("click", toggleCollaboration);
 endSessionDownloadButton.addEventListener("click", endClassSession);
@@ -2665,6 +2841,8 @@ routineInputs.forEach((input) => {
     state.routines = {
       entry: Boolean(routineEntry?.checked),
       ready: Boolean(routineReady?.checked),
+      learningIntention: Boolean(routineLearningIntention?.checked),
+      retrieval: Boolean(routineRetrieval?.checked),
       tidy: Boolean(routineTidy?.checked),
       chairs: Boolean(routineChairs?.checked),
       exit: Boolean(routineExit?.checked),

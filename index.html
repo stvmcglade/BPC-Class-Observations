@@ -47,6 +47,14 @@
               <input id="routineReady" type="checkbox">
               <span>Ready to Learn</span>
             </label>
+            <label class="routine-check">
+              <input id="routineLearningIntention" type="checkbox">
+              <span>Learning Intention and Success Criteria</span>
+            </label>
+            <label class="routine-check">
+              <input id="routineRetrieval" type="checkbox">
+              <span>Retrieval task</span>
+            </label>
           </section>
 
           <section class="routine-group" aria-labelledby="endOfLessonLabel">
@@ -75,11 +83,13 @@
           </div>
           <div class="mode-definitions" aria-label="Teaching mode definitions">
             <p><strong>Direct Instruction</strong> - Teacher is instructing to the whole class</p>
+            <p><strong>Collaborative Instruction</strong> - Teacher is engaging and seeking responses with individual students/whole class, and the whole class is involved in this activity</p>
             <p><strong>Independent Work</strong> - Students are working on assigned tasks without teacher involvement</p>
             <p><strong>Independent Work/Teacher collaboration</strong> - Students are working on assigned tasks, and the teacher is monitoring, conferencing, and assisting individual students</p>
           </div>
           <div class="timing-actions">
-            <button id="directInstructionToggle" class="accent-button">Start Direct Instruction</button>
+            <button id="directInstructionToggle" class="ghost-button direct-instruction-button">Start Direct Instruction</button>
+            <button id="collaborativeInstructionToggle" class="ghost-button collaborative-instruction-button">Start Collaborative Instruction</button>
             <button id="independentWorkToggle" class="ghost-button independent-button">Start Independent Work</button>
             <button id="collaborationToggle" class="ghost-button collaboration-button">Start Independent Work/Teacher Collaboration</button>
           </div>
@@ -96,6 +106,11 @@
             <span id="directInstructionShare" class="metric-detail">0%</span>
           </article>
           <article class="metric-card">
+            <p>Collaborative Instruction</p>
+            <strong id="collaborativeInstructionTime">00:00:00</strong>
+            <span id="collaborativeInstructionShare" class="metric-detail">0%</span>
+          </article>
+          <article class="metric-card">
             <p>Independent Work</p>
             <strong id="independentWorkTime">00:00:00</strong>
             <span id="independentWorkShare" class="metric-detail">0%</span>
@@ -110,10 +125,11 @@
         <div class="progress-panel">
           <div class="progress-copy">
             <span id="instructionStatus">All teaching modes are currently paused.</span>
-            <span id="segmentCount">Direct: 0 | Independent: 0 | Collaboration: 0</span>
+            <span id="segmentCount">Direct: 0 | Collaborative: 0 | Independent: 0 | Teacher Collaboration: 0</span>
           </div>
           <div class="progress-track" aria-hidden="true">
             <div id="instructionProgress" class="progress-fill direct"></div>
+            <div id="collaborativeInstructionProgress" class="progress-fill collaborative-instruction"></div>
             <div id="independentProgress" class="progress-fill independent"></div>
             <div id="collaborationProgress" class="progress-fill collaboration"></div>
           </div>
@@ -277,7 +293,7 @@
           <article class="chart-card">
             <div class="chart-copy">
               <h3>Lesson Time Breakdown</h3>
-              <p>Compare the observed lesson time with the portion spent in direct instruction.</p>
+              <p>Compare the observed lesson time across direct, collaborative, independent, and teacher collaboration modes.</p>
             </div>
             <div id="timeBreakdownChart" class="chart-surface">
               <p class="chart-empty">Start the observation to build the lesson time comparison.</p>
@@ -318,6 +334,6 @@
     </section>
   </div>
 
-  <script src="app.js?v=20260526-2"></script>
+  <script src="app.js?v=20260602-1"></script>
 </body>
 </html>

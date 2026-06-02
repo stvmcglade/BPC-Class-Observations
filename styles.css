@@ -12,6 +12,8 @@
   --accent-dark: #d97706;
   --independent: #38bdf8;
   --independent-dark: #0ea5e9;
+  --collaborative-instruction: #2dd4bf;
+  --collaborative-instruction-dark: #0f766e;
   --collaboration: #f59e0b;
   --collaboration-dark: #d97706;
   --question: #60a5fa;
@@ -165,18 +167,16 @@ button:active {
   transform: translateY(0);
 }
 
-.primary-button,
-.accent-button,
-.tool-button.active {
+.primary-button {
   color: #03110a;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   box-shadow: 0 14px 24px rgba(34, 197, 94, 0.24);
 }
 
-.accent-button.running {
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: #231404;
-  box-shadow: 0 14px 24px rgba(245, 158, 11, 0.24);
+.direct-instruction-button.running {
+  color: #03110a;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 14px 24px rgba(34, 197, 94, 0.24);
 }
 
 .end-session-button {
@@ -191,6 +191,12 @@ button:active {
   box-shadow: 0 14px 24px rgba(56, 189, 248, 0.24);
 }
 
+.collaborative-instruction-button.running {
+  color: #041311;
+  background: linear-gradient(135deg, var(--collaborative-instruction), var(--collaborative-instruction-dark));
+  box-shadow: 0 14px 24px rgba(45, 212, 191, 0.24);
+}
+
 .collaboration-button.running {
   color: #231404;
   background: linear-gradient(135deg, var(--collaboration), var(--collaboration-dark));
@@ -202,6 +208,24 @@ button:active {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(189, 208, 224, 0.14);
+}
+
+.tool-button.active[data-tool="question"] {
+  color: #08111d;
+  background: linear-gradient(135deg, var(--question), #3b82f6);
+  box-shadow: 0 14px 24px rgba(96, 165, 250, 0.24);
+}
+
+.tool-button.active[data-tool="disruption"] {
+  color: #260808;
+  background: linear-gradient(135deg, var(--disruption), #ef4444);
+  box-shadow: 0 14px 24px rgba(248, 113, 113, 0.24);
+}
+
+.tool-button.active[data-tool="teacherMovement"] {
+  color: #03110a;
+  background: linear-gradient(135deg, var(--movement), var(--primary-dark));
+  box-shadow: 0 14px 24px rgba(34, 197, 94, 0.24);
 }
 
 .dashboard-grid {
@@ -409,6 +433,10 @@ td {
 
 .progress-fill.independent {
   background: linear-gradient(90deg, var(--independent), #7dd3fc);
+}
+
+.progress-fill.collaborative-instruction {
+  background: linear-gradient(90deg, var(--collaborative-instruction), #99f6e4);
 }
 
 .progress-fill.collaboration {
@@ -808,7 +836,7 @@ tbody td {
   background: var(--passive);
 }
 
-.tool-button[data-tool="passiveDisengagement"].active {
+.tool-button.active[data-tool="passiveDisengagement"] {
   color: #231404;
   background: linear-gradient(135deg, var(--passive), #eab308);
   box-shadow: 0 14px 24px rgba(250, 204, 21, 0.24);
